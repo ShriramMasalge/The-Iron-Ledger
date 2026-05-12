@@ -392,7 +392,7 @@ export default function Home() {
 
   const nowSec     = Math.floor(Date.now() / 1000);
   const active     = trades.filter(t => !['Completed','Cancelled'].includes(t.state)).length;
-  const lockedWei  = trades.filter(t => ['Funded','InTransit','Delivered'].includes(t.state)).reduce((a, t) => a + BigInt(t.amount), 0n);
+  const lockedWei  = trades.filter(t => ['Funded','InTransit','Delivered'].includes(t.state)).reduce((a, t) => a + BigInt(t.amount), BigInt(0));
   const lockedEth  = parseFloat(ethers.utils.formatEther(lockedWei.toString())).toFixed(3);
   const overdueCnt = trades.filter(t => t.deadline < nowSec && ['Funded','InTransit'].includes(t.state)).length;
 
