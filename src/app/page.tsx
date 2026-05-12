@@ -157,8 +157,8 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
   const isSeller   = account.toLowerCase() === trade.seller.toLowerCase();
   const stateIdx   = STATE_LABELS.indexOf(trade.state);
   const isTerminal = trade.state === 'Completed' || trade.state === 'Cancelled';
-  // Slashing only valid on Funded or InTransit — NOT Delivered (buyer should just completeTrade)
-  const canSlash   = overdue && (trade.state === 'Funded' || trade.state === 'InTransit') && isBuyer && !trade.sellerSlashed && trade.state !== 'Delivered';
+  // Slashing only valid on Funded or InTransit — Delivered state uses completeTrade instead
+  const canSlash   = overdue && (trade.state === 'Funded' || trade.state === 'InTransit') && isBuyer && !trade.sellerSlashed;
   const isActing   = txLoading === trade.id;
   const totalSecs  = Math.max(trade.deadline - trade.createdAt, 1);
 
