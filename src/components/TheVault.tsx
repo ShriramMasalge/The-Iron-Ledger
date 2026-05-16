@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ethers } from 'ethers';
 
 type TradeState = 'Created' | 'Funded' | 'InTransit' | 'Delivered' | 'Completed' | 'Cancelled';
@@ -45,6 +45,107 @@ function formatEth(wei: string | bigint) {
 }
 function shortenAddr(a: string) { return `${a.slice(0,6)}…${a.slice(-4)}`; }
 
+// ── CSV Export ───────────────────────────────────────────────────
+function exportCSV(trades: Trade[], account: string) {
+  const headers = [
+    'Trade ID',
+    'Role',
+    'Counterparty',
+    'Buyer',
+    'Seller',
+    'Amount (ETH)',
+    'State',
+    'Penalty (bps)',
+    'Penalty (%)',
+    'Slashed',
+    'Created At',
+    'Deadline',
+    'Deadline UTC',
+  ];
+
+  const rows = trades.map(t => {
+    const isBuyer     = t.buyer.toLowerCase() === account.toLowerCase();
+    const counterparty = isBuyer ? t.seller : t.buyer;
+    const amountEth   = formatEth(t.amount);
+    const createdStr  = new Date(t.createdAt * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    const deadlineStr = new Date(t.deadline  * 1000).toISOString().replace('T', ' ').slice(0, 19);
+
+    return [
+      t.id,
+      isBuyer ? 'Buyer' : 'Seller',
+      counterparty,
+      t.buyer,
+      t.seller,
+      amountEth,
+      t.state,
+      t.slashingPenaltyBps,
+      (t.slashingPenaltyBps / 100).toFixed(2) + '%',
+      t.sellerSlashed ? 'Yes' : 'No',
+      createdStr,
+      t.deadline,
+      deadlineStr,
+    ];
+  });
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const ts   = new Date().toISOString().slice(0, 10);
+  a.href     = url;
+  a.download = `iron-ledger-trades-${ts}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Export button ────────────────────────────────────────────────
+function ExportButton({ onClick, count }: { onClick: () => void; count: number }) {
+  const [flash, setFlash] = useState(false);
+
+  const handleClick = () => {
+    onClick();
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1200);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      title={`Export ${count} records to CSV`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '6px 14px',
+        background: flash ? 'rgba(184,255,0,0.12)' : 'rgba(184,255,0,0.05)',
+        border: `1px solid ${flash ? 'rgba(184,255,0,0.5)' : 'rgba(184,255,0,0.2)'}`,
+        borderRadius: '4px',
+        color: flash ? C.accent : 'rgba(184,255,0,0.6)',
+        fontSize: '10px',
+        fontFamily: C.mono,
+        fontWeight: 600,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        cursor: count === 0 ? 'not-allowed' : 'pointer',
+        opacity: count === 0 ? 0.35 : 1,
+        transition: 'all 0.2s',
+        whiteSpace: 'nowrap',
+      }}
+      disabled={count === 0}
+    >
+      {flash ? '✓ Exported' : '↓ CSV'}
+      {!flash && (
+        <span style={{ fontSize: '9px', color: 'rgba(184,255,0,0.4)', fontWeight: 400 }}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ── Reputation Seal SVG ──────────────────────────────────────────
 function IronSeal({ score }: { score: number }) {
   const tier = score >= 90 ? 'IRON' : score >= 70 ? 'BRONZE' : score >= 50 ? 'SILVER' : 'UNRANKED';
@@ -55,7 +156,6 @@ function IronSeal({ score }: { score: number }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
       <svg width="120" height="120" viewBox="0 0 120 120">
-        {/* Outer glow */}
         <defs>
           <filter id="sealGlow">
             <feGaussianBlur stdDeviation="3" result="blur"/>
@@ -66,12 +166,10 @@ function IronSeal({ score }: { score: number }) {
             <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        {/* Background rings */}
         {rings.map((r, i) => (
           <circle key={i} cx="60" cy="60" r={r} fill="none"
             stroke="rgba(255,255,255,0.04)" strokeWidth="1.5"/>
         ))}
-        {/* Progress arc - outer */}
         <circle cx="60" cy="60" r={44} fill="none"
           stroke={tierColor} strokeWidth="2.5" opacity="0.3"
           strokeDasharray={`${pct * 2 * Math.PI * 44} ${2 * Math.PI * 44}`}
@@ -79,18 +177,14 @@ function IronSeal({ score }: { score: number }) {
           transform="rotate(-90 60 60)"
           style={{ filter:`drop-shadow(0 0 4px ${tierColor})` }}
         />
-        {/* Score arc - inner */}
         <circle cx="60" cy="60" r={28} fill="none"
           stroke={tierColor} strokeWidth="1.5" opacity="0.5"
           strokeDasharray={`${pct * 2 * Math.PI * 28} ${2 * Math.PI * 28}`}
           strokeLinecap="round"
           transform="rotate(-90 60 60)"
         />
-        {/* Center */}
         <circle cx="60" cy="60" r="18" fill={`${tierColor}10`} stroke={`${tierColor}30`} strokeWidth="1"/>
-        {/* Hex icon */}
         <text x="60" y="65" textAnchor="middle" fontSize="18" fill={tierColor} style={{fontFamily:'serif'}}>⚖</text>
-        {/* Corner marks */}
         {[0,90,180,270].map(deg => {
           const r2 = 44, angle = (deg - 90) * Math.PI / 180;
           const x = 60 + r2 * Math.cos(angle), y = 60 + r2 * Math.sin(angle);
@@ -127,21 +221,6 @@ function Sparkline({ points, color = C.accent, height = 40 }: { points: number[]
       <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       <circle cx={(points.length-1)*step} cy={toY(points[points.length-1])} r="2.5" fill={color}/>
     </svg>
-  );
-}
-
-// ── Bar chart ────────────────────────────────────────────────────
-function BarChart({ data, color = C.accent }: { data: { label: string; value: number }[]; color?: string }) {
-  const max = Math.max(...data.map(d => d.value), 1);
-  return (
-    <div style={{ display:'flex', alignItems:'flex-end', gap:'6px', height:'60px' }}>
-      {data.map(({ label, value }) => (
-        <div key={label} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', height:'100%', justifyContent:'flex-end' }}>
-          <div style={{ width:'100%', background:color, opacity:0.8, borderRadius:'2px 2px 0 0', height:`${(value / max) * 48}px`, minHeight: value > 0 ? '4px' : '0', transition:'height 0.6s ease', boxShadow:`0 0 6px ${color}40` }}/>
-          <div style={{ fontSize:'8px', color:C.dim, letterSpacing:'0.08em', textTransform:'uppercase' as const }}>{label}</div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -190,29 +269,24 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
     const asSeller   = myTrades.filter(t => t.seller.toLowerCase() === account.toLowerCase());
     const active     = myTrades.filter(t => !['Completed','Cancelled'].includes(t.state));
 
-    // Volume
     const totalVol = myTrades.reduce((a, t) => a + BigInt(t.amount), BigInt(0));
     const completedVol = completed.reduce((a, t) => a + BigInt(t.amount), BigInt(0));
 
-    // On-time rate (completed without slashing)
     const onTimeCompleted = completed.filter(t => !t.sellerSlashed).length;
     const onTimeRate = completed.length > 0 ? Math.round((onTimeCompleted / completed.length) * 100) : 100;
 
-    // Penalty ETH seized
     const penaltySeized = slashed.reduce((a, t) => {
       const penalty = BigInt(t.amount) * BigInt(t.slashingPenaltyBps) / BigInt(10000);
       return a + penalty;
     }, BigInt(0));
 
-    // Reputation score: weighted composite
-    const volScore     = Math.min(parseFloat(formatEth(totalVol.toString())) * 20, 30);  // max 30
-    const onTimeScore  = onTimeRate * 0.4;                                                 // max 40
-    const countScore   = Math.min(completed.length * 3, 20);                               // max 20
-    const slashPenalty = slashed.length * 5;                                               // -5 per slash
+    const volScore     = Math.min(parseFloat(formatEth(totalVol.toString())) * 20, 30);
+    const onTimeScore  = onTimeRate * 0.4;
+    const countScore   = Math.min(completed.length * 3, 20);
+    const slashPenalty = slashed.length * 5;
     const rawScore     = Math.max(0, Math.round(volScore + onTimeScore + countScore - slashPenalty));
     const repScore     = Math.min(rawScore, 99);
 
-    // Monthly volume for sparkline (last 6 months)
     const now = Date.now();
     const monthlyVol: number[] = Array(6).fill(0);
     myTrades.forEach(t => {
@@ -234,12 +308,12 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
     const counts: Partial<Record<TradeState, number>> = {};
     trades.forEach(t => { counts[t.state] = (counts[t.state] || 0) + 1; });
     return ([
-      { label: 'Crtd', value: counts['Created']   || 0, color: '#9999ff' },
-      { label: 'Fund', value: counts['Funded']     || 0, color: C.accent },
-      { label: 'Trnst', value: counts['InTransit'] || 0, color: C.warn },
-      { label: 'Dlvd', value: counts['Delivered']  || 0, color: '#00cc77' },
-      { label: 'Done', value: counts['Completed']  || 0, color: C.mid },
-      { label: 'Cncl', value: counts['Cancelled']  || 0, color: C.danger },
+      { label: 'Crtd',  value: counts['Created']   || 0, color: '#9999ff' },
+      { label: 'Fund',  value: counts['Funded']     || 0, color: C.accent },
+      { label: 'Trnst', value: counts['InTransit']  || 0, color: C.warn },
+      { label: 'Dlvd',  value: counts['Delivered']  || 0, color: '#00cc77' },
+      { label: 'Done',  value: counts['Completed']  || 0, color: C.mid },
+      { label: 'Cncl',  value: counts['Cancelled']  || 0, color: C.danger },
     ]);
   }, [trades]);
 
@@ -257,7 +331,10 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
     return list;
   }, [trades, filter, sort, search, account]);
 
-  const accent = C.accent;
+  // ── CSV handler — exports whatever is currently visible ───────
+  const handleExport = useCallback(() => {
+    exportCSV(history, account);
+  }, [history, account]);
 
   return (
     <div style={{ minHeight:'100vh', background:C.bg, color:C.text, fontFamily:C.mono }}>
@@ -293,7 +370,6 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
 
         {/* Top row: Seal + Key metrics */}
         <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:'20px', marginBottom:'20px' }}>
-          {/* Seal panel */}
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'28px 20px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'16px' }}>
             <div style={{ fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, alignSelf:'flex-start' }}>· Vault Seal</div>
             <IronSeal score={stats.repScore} />
@@ -305,15 +381,14 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
             </div>
           </div>
 
-          {/* Metrics grid */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gridTemplateRows:'1fr 1fr', gap:'1px', background:C.border, borderRadius:'8px', overflow:'hidden' }}>
             {[
-              { label:'Total Trades',    value: String(stats.total),                   color: C.text },
-              { label:'Completed',       value: String(stats.completed),                color: C.accent },
-              { label:'Active',          value: String(stats.active),                   color: stats.active > 0 ? C.warn : C.dim },
-              { label:'Total Volume',    value: formatEth(stats.totalVol.toString())+' ETH', color: C.accent },
-              { label:'On-Time Rate',    value: `${stats.onTimeRate}%`,                 color: stats.onTimeRate >= 90 ? C.accent : stats.onTimeRate >= 70 ? C.warn : C.danger },
-              { label:'Penalty Seized',  value: formatEth(stats.penaltySeized.toString())+' ETH', color: stats.slashed > 0 ? C.danger : C.dim },
+              { label:'Total Trades',   value: String(stats.total),                             color: C.text },
+              { label:'Completed',      value: String(stats.completed),                          color: C.accent },
+              { label:'Active',         value: String(stats.active),                             color: stats.active > 0 ? C.warn : C.dim },
+              { label:'Total Volume',   value: formatEth(stats.totalVol.toString())+' ETH',      color: C.accent },
+              { label:'On-Time Rate',   value: `${stats.onTimeRate}%`,                           color: stats.onTimeRate >= 90 ? C.accent : stats.onTimeRate >= 70 ? C.warn : C.danger },
+              { label:'Penalty Seized', value: formatEth(stats.penaltySeized.toString())+' ETH', color: stats.slashed > 0 ? C.danger : C.dim },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background:C.bg, padding:'18px 20px' }}>
                 <div style={{ fontSize:'9px', letterSpacing:'0.18em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'6px' }}>{label}</div>
@@ -325,7 +400,6 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
 
         {/* Middle row: Sparkline + Bar + Role split */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 180px 160px', gap:'20px', marginBottom:'20px' }}>
-          {/* Volume sparkline */}
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'20px' }}>
             <div style={{ fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'14px' }}>· Volume (6-month)</div>
             <Sparkline points={stats.monthlyVol} color={C.accent} height={52}/>
@@ -335,7 +409,6 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
             </div>
           </div>
 
-          {/* State distribution */}
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'20px' }}>
             <div style={{ fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'14px' }}>· Trade States</div>
             <div style={{ display:'flex', alignItems:'flex-end', gap:'5px', height:'60px' }}>
@@ -351,7 +424,6 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
             </div>
           </div>
 
-          {/* Buyer / Seller split */}
           <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'20px' }}>
             <div style={{ fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'14px' }}>· Role Split</div>
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
@@ -381,6 +453,7 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
 
         {/* Trade history table */}
         <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', overflow:'hidden' }}>
+
           {/* Table header */}
           <div style={{ padding:'16px 20px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'12px' }}>
             <div>
@@ -400,6 +473,8 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
                 <option value="date">Sort: Date</option>
                 <option value="amount">Sort: Amount</option>
               </select>
+              {/* ── CSV Export button ── */}
+              <ExportButton onClick={handleExport} count={history.length} />
             </div>
           </div>
 
@@ -449,10 +524,10 @@ export default function TheVault({ account, trades, onBack }: TheVaultProps) {
         {/* Bottom: Protocol stats strip */}
         <div style={{ marginTop:'20px', display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'1px', background:C.border, borderRadius:'8px', overflow:'hidden' }}>
           {[
-            { label:'Protocol',       value:'Iron Ledger v1' },
-            { label:'Network',        value:'Sepolia / Local' },
-            { label:'Slashing Bps',   value: trades.length > 0 ? `${trades[0].slashingPenaltyBps} bps` : '—' },
-            { label:'Vault Version',  value:'v0.5.0' },
+            { label:'Protocol',      value:'Iron Ledger v1' },
+            { label:'Network',       value:'Sepolia / Local' },
+            { label:'Slashing Bps',  value: trades.length > 0 ? `${trades[0].slashingPenaltyBps} bps` : '—' },
+            { label:'Vault Version', value:'v0.5.1' },
           ].map(({ label, value }) => (
             <div key={label} style={{ background:C.bg, padding:'14px 18px' }}>
               <div style={{ fontSize:'8px', letterSpacing:'0.18em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'4px' }}>{label}</div>
