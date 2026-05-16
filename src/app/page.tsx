@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../constants';
-import IronLedgerTour from '../components/IronLedgerTour';
+import { OnboardingTour, TourButton } from '../components/OnboardingTour';
+import GlobalCommand from '../components/GlobalCommand';
+import TheForge from '../components/TheForge';
+import WarRoom from '../components/WarRoom';
+import TheVault from '../components/TheVault';
 
 type TradeState = 'Created' | 'Funded' | 'InTransit' | 'Delivered' | 'Completed' | 'Cancelled';
 
@@ -23,8 +27,11 @@ const STATE_LABELS: TradeState[] = ['Created', 'Funded', 'InTransit', 'Delivered
 
 function shortenAddr(a: string) { return `${a.slice(0, 6)}…${a.slice(-4)}`; }
 function formatEth(wei: string) { return parseFloat(ethers.utils.formatEther(wei)).toFixed(4); }
+function getExplorerUrl(hash: string, chainId: number) {
+  if (chainId === 11155111) return `https://sepolia.etherscan.io/tx/${hash}`;
+  return null;
+}
 
-// ── Live countdown hook — ticks every second ──────────────────
 function useCountdown(deadlineTs: number) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
@@ -39,67 +46,111 @@ function useCountdown(deadlineTs: number) {
   return { overdue: false, text: `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`, h, m, s, seconds: diff };
 }
 
-// ── Design tokens ─────────────────────────────────────────────
 const C = {
-  bg:       '#080909',
-  surface:  '#0f1011',
-  border:   'rgba(255,255,255,0.06)',
-  accent:   '#b8ff00',
-  danger:   '#ff3535',
-  text:     '#ddd9d0',
-  mid:      'rgba(255,255,255,0.4)',
-  dim:      'rgba(255,255,255,0.18)',
-  mono:     "'DM Mono','Courier New',monospace",
-  serif:    "'DM Serif Display',Georgia,serif",
+  bg:      '#080909',
+  surface: '#0f1011',
+  border:  'rgba(255,255,255,0.06)',
+  accent:  '#b8ff00',
+  danger:  '#ff3535',
+  text:    '#ddd9d0',
+  mid:     'rgba(255,255,255,0.4)',
+  dim:     'rgba(255,255,255,0.18)',
+  mono:    "'DM Mono','Courier New',monospace",
+  serif:   "'DM Serif Display',Georgia,serif",
 };
 
 const S: Record<string, React.CSSProperties> = {
-  root:      { minHeight:'100vh', background:C.bg, color:C.text, fontFamily:C.mono, margin:0, padding:0 },
-  grid:      { position:'fixed', inset:0, backgroundImage:`linear-gradient(${C.border} 1px,transparent 1px),linear-gradient(90deg,${C.border} 1px,transparent 1px)`, backgroundSize:'52px 52px', pointerEvents:'none', zIndex:0 },
-  page:      { position:'relative', zIndex:1, maxWidth:'800px', margin:'0 auto', padding:'0 24px 100px' },
-  header:    { padding:'40px 0 28px', borderBottom:`1px solid ${C.border}`, marginBottom:'32px' },
-  hrow:      { display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap' as const, gap:'12px' },
-  eyebrow:   { fontSize:'10px', letterSpacing:'0.22em', color:C.accent, textTransform:'uppercase' as const, marginBottom:'6px', fontWeight:600 },
-  title:     { fontSize:'30px', fontFamily:C.serif, fontWeight:700, color:'#f2ede6', margin:'0 0 4px', letterSpacing:'-0.02em' },
-  subtitle:  { fontSize:'11px', color:C.dim, letterSpacing:'0.1em', textTransform:'uppercase' as const, margin:0 },
-  chip:      { display:'flex', alignItems:'center', gap:'9px', background:'rgba(255,255,255,0.03)', border:`1px solid ${C.border}`, borderRadius:'100px', padding:'8px 14px 8px 10px' },
-  chipDot:   { width:'7px', height:'7px', borderRadius:'50%', background:C.accent, boxShadow:`0 0 8px ${C.accent}` },
-  chipX:     { background:'none', border:'none', color:C.dim, fontSize:'11px', cursor:'pointer', paddingLeft:'6px' },
-  stats:     { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1px', background:C.border, borderRadius:'8px', overflow:'hidden', marginBottom:'28px' },
-  statCell:  { background:C.bg, padding:'18px 20px', textAlign:'center' as const },
-  statNum:   { fontSize:'24px', fontWeight:700, fontFamily:C.serif, color:C.accent, lineHeight:1.1, marginBottom:'5px' },
-  statLbl:   { fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const },
-  panel:     { background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'26px', marginBottom:'24px' },
-  fg:        { marginBottom:'16px' },
-  lbl:       { display:'block' as const, fontSize:'10px', fontWeight:600, letterSpacing:'0.15em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'8px' },
-  input:     { width:'100%', padding:'12px 14px', background:'rgba(255,255,255,0.025)', border:`1px solid ${C.border}`, borderRadius:'4px', fontSize:'13px', color:C.text, fontFamily:C.mono, outline:'none', boxSizing:'border-box' as const, transition:'border-color 0.15s' },
-  hint:      { fontSize:'11px', color:C.dim, marginTop:'5px' },
-  grid2:     { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'16px' },
-  btnPrimary:{ width:'100%', padding:'15px', background:C.accent, color:C.bg, border:'none', borderRadius:'4px', fontSize:'13px', fontWeight:700, cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' as const, fontFamily:C.mono },
-  btnGhost:  { width:'100%', padding:'12px', background:'transparent', color:C.mid, border:`1px solid ${C.border}`, borderRadius:'4px', fontSize:'12px', cursor:'pointer', letterSpacing:'0.06em', textTransform:'uppercase' as const, fontFamily:C.mono },
-  btnDanger: { width:'100%', padding:'12px', background:'rgba(255,53,53,0.08)', color:C.danger, border:'1px solid rgba(255,53,53,0.25)', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, fontFamily:C.mono },
-  btnSlash:  { width:'100%', padding:'16px', background:'linear-gradient(135deg,rgba(255,53,53,0.15),rgba(255,100,0,0.08))', color:C.danger, border:'1px solid rgba(255,53,53,0.5)', borderRadius:'4px', fontSize:'12px', fontWeight:700, cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, fontFamily:C.mono },
-  alertErr:  { background:'rgba(255,53,53,0.06)', border:'1px solid rgba(255,53,53,0.2)', borderRadius:'4px', padding:'12px 14px', fontSize:'12px', color:'#ff7070', marginBottom:'16px' },
-  alertOk:   { background:'rgba(184,255,0,0.04)', border:'1px solid rgba(184,255,0,0.2)', borderRadius:'4px', padding:'12px 14px', fontSize:'12px', color:C.accent, marginBottom:'16px' },
-  secLbl:    { fontSize:'10px', fontWeight:600, letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'14px' },
-  privRow:   { display:'flex', alignItems:'center', justifyContent:'flex-end', gap:'10px', marginBottom:'16px' },
-  empty:     { textAlign:'center' as const, padding:'48px 20px', color:C.dim, fontSize:'13px' },
-  cwrap:     { display:'flex', flexDirection:'column' as const, alignItems:'center', justifyContent:'center', minHeight:'60vh', textAlign:'center' as const, gap:'20px' },
-  blur:      { filter:'blur(6px)', userSelect:'none' as const, pointerEvents:'none' as const },
-  actions:   { display:'grid', gap:'8px', marginTop:'16px' },
-  demoBox:   { padding:'10px 14px', background:'rgba(184,255,0,0.04)', border:'1px solid rgba(184,255,0,0.1)', borderRadius:'4px', fontSize:'11px', color:C.mid, marginBottom:'16px', lineHeight:1.7 },
-  tourBtn:   { background:'none', border:`1px solid ${C.border}`, borderRadius:'100px', padding:'5px 12px', fontSize:'10px', letterSpacing:'0.1em', color:C.dim, cursor:'pointer', fontFamily:"'DM Mono','Courier New',monospace", textTransform:'uppercase' as const },
+  root:       { minHeight:'100vh', background:C.bg, color:C.text, fontFamily:C.mono, margin:0, padding:0 },
+  grid:       { position:'fixed', inset:0, backgroundImage:`linear-gradient(${C.border} 1px,transparent 1px),linear-gradient(90deg,${C.border} 1px,transparent 1px)`, backgroundSize:'52px 52px', pointerEvents:'none', zIndex:0 },
+  page:       { position:'relative', zIndex:1, maxWidth:'800px', margin:'0 auto', padding:'0 24px 100px' },
+  header:     { padding:'40px 0 28px', borderBottom:`1px solid ${C.border}`, marginBottom:'32px' },
+  hrow:       { display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap' as const, gap:'12px' },
+  eyebrow:    { fontSize:'10px', letterSpacing:'0.22em', color:C.accent, textTransform:'uppercase' as const, marginBottom:'6px', fontWeight:600 },
+  title:      { fontSize:'30px', fontFamily:C.serif, fontWeight:700, color:'#f2ede6', margin:'0 0 4px', letterSpacing:'-0.02em' },
+  subtitle:   { fontSize:'11px', color:C.dim, letterSpacing:'0.1em', textTransform:'uppercase' as const, margin:0 },
+  chip:       { display:'flex', alignItems:'center', gap:'9px', background:'rgba(255,255,255,0.03)', border:`1px solid ${C.border}`, borderRadius:'100px', padding:'8px 14px 8px 10px' },
+  chipDot:    { width:'7px', height:'7px', borderRadius:'50%', background:C.accent, boxShadow:`0 0 8px ${C.accent}` },
+  chipX:      { background:'none', border:'none', color:C.dim, fontSize:'11px', cursor:'pointer', paddingLeft:'6px' },
+  stats:      { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1px', background:C.border, borderRadius:'8px', overflow:'hidden', marginBottom:'28px' },
+  statCell:   { background:C.bg, padding:'18px 20px', textAlign:'center' as const },
+  statNum:    { fontSize:'24px', fontWeight:700, fontFamily:C.serif, color:C.accent, lineHeight:1.1, marginBottom:'5px' },
+  statLbl:    { fontSize:'9px', letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const },
+  panel:      { background:C.surface, border:`1px solid ${C.border}`, borderRadius:'8px', padding:'26px', marginBottom:'24px' },
+  fg:         { marginBottom:'16px' },
+  lbl:        { display:'block' as const, fontSize:'10px', fontWeight:600, letterSpacing:'0.15em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'8px' },
+  input:      { width:'100%', padding:'12px 14px', background:'rgba(255,255,255,0.025)', border:`1px solid ${C.border}`, borderRadius:'4px', fontSize:'13px', color:C.text, fontFamily:C.mono, outline:'none', boxSizing:'border-box' as const, transition:'border-color 0.15s' },
+  hint:       { fontSize:'11px', color:C.dim, marginTop:'5px' },
+  grid2:      { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'16px' },
+  btnPrimary: { width:'100%', padding:'15px', background:C.accent, color:C.bg, border:'none', borderRadius:'4px', fontSize:'13px', fontWeight:700, cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' as const, fontFamily:C.mono },
+  btnGhost:   { width:'100%', padding:'12px', background:'transparent', color:C.mid, border:`1px solid ${C.border}`, borderRadius:'4px', fontSize:'12px', cursor:'pointer', letterSpacing:'0.06em', textTransform:'uppercase' as const, fontFamily:C.mono },
+  btnDanger:  { width:'100%', padding:'12px', background:'rgba(255,53,53,0.08)', color:C.danger, border:'1px solid rgba(255,53,53,0.25)', borderRadius:'4px', fontSize:'11px', fontWeight:700, cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, fontFamily:C.mono },
+  btnSlash:   { width:'100%', padding:'16px', background:'linear-gradient(135deg,rgba(255,53,53,0.15),rgba(255,100,0,0.08))', color:C.danger, border:'1px solid rgba(255,53,53,0.5)', borderRadius:'4px', fontSize:'12px', fontWeight:700, cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, fontFamily:C.mono },
+  receipt:    { display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', background:'rgba(184,255,0,0.04)', border:'1px solid rgba(184,255,0,0.2)', borderRadius:'4px', padding:'12px 16px', fontSize:'12px', color:C.accent, marginBottom:'16px' },
+  alertErr:   { background:'rgba(255,53,53,0.06)', border:'1px solid rgba(255,53,53,0.2)', borderRadius:'4px', padding:'12px 14px', fontSize:'12px', color:'#ff7070', marginBottom:'16px' },
+  secLbl:     { fontSize:'10px', fontWeight:600, letterSpacing:'0.2em', color:C.dim, textTransform:'uppercase' as const, marginBottom:'14px' },
+  empty:      { textAlign:'center' as const, padding:'48px 20px', color:C.dim, fontSize:'13px' },
+  cwrap:      { display:'flex', flexDirection:'column' as const, alignItems:'center', justifyContent:'center', minHeight:'60vh', textAlign:'center' as const, gap:'20px' },
+  blur:       { filter:'blur(6px)', userSelect:'none' as const, pointerEvents:'none' as const },
+  actions:    { display:'grid', gap:'8px', marginTop:'16px' },
+  demoBox:    { padding:'10px 14px', background:'rgba(184,255,0,0.04)', border:'1px solid rgba(184,255,0,0.1)', borderRadius:'4px', fontSize:'11px', color:C.mid, marginBottom:'16px', lineHeight:1.7 },
+  formToggle: { display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', userSelect:'none' as const },
 };
 
-// ── Countdown Ring ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// SPLASH GATE
+// ═══════════════════════════════════════════════════════════════
+function TerminalBoot({ onAuthenticate }: { onAuthenticate: () => void }) {
+  const [connecting, setConnecting] = useState(false);
+  const [err, setErr] = useState('');
+  const mono = "'DM Mono','Courier New',monospace";
+  const accent = '#b8ff00';
+
+  const handleClick = async () => {
+    setConnecting(true); setErr('');
+    try { await onAuthenticate(); }
+    catch { setErr('Connection failed. Try again.'); setConnecting(false); }
+  };
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, backgroundImage:'linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)', backgroundSize:'52px 52px' }}>
+      <div style={{position:'fixed',top:0,left:0,width:28,height:28,borderTop:`2px solid ${accent}22`,borderLeft:`2px solid ${accent}22`}}/>
+      <div style={{position:'fixed',top:0,right:0,width:28,height:28,borderTop:`2px solid ${accent}22`,borderRight:`2px solid ${accent}22`}}/>
+      <div style={{position:'fixed',bottom:0,left:0,width:28,height:28,borderBottom:`2px solid ${accent}22`,borderLeft:`2px solid ${accent}22`}}/>
+      <div style={{position:'fixed',bottom:0,right:0,width:28,height:28,borderBottom:`2px solid ${accent}22`,borderRight:`2px solid ${accent}22`}}/>
+      <div style={{position:'fixed',top:16,left:0,right:0,textAlign:'center',fontSize:10,letterSpacing:'0.2em',color:'rgba(255,255,255,0.15)'}}>
+        IRON LEDGER // TERMINAL v4.1 — GLOBAL SETTLEMENT PROTOCOL
+      </div>
+      <div style={{width:'100%',maxWidth:400,padding:'48px 40px',background:'rgba(255,255,255,0.015)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:12,textAlign:'center'}}>
+        <div style={{fontSize:40,marginBottom:24,opacity:0.9}}>⚖</div>
+        <div style={{fontSize:10,letterSpacing:'0.22em',color:accent,textTransform:'uppercase',marginBottom:8}}>Iron Ledger Protocol v1</div>
+        <div style={{fontSize:26,fontFamily:"'DM Serif Display',Georgia,serif",color:'#f2ede6',fontWeight:700,marginBottom:6,letterSpacing:'-0.02em'}}>The Iron Ledger</div>
+        <div style={{fontSize:11,color:'rgba(255,255,255,0.18)',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:32}}>Autonomous Arbitration &amp; Escrow</div>
+        <div style={{display:'flex',gap:8,justifyContent:'center',marginBottom:32}}>
+          {[{label:'Arbitrum',color:'#00ff9d'},{label:'Chainlink',color:'#38bdf8'},{label:'ZK-Proof',color:'#a78bfa'}].map(({label,color})=>(
+            <span key={label} style={{fontSize:9,padding:'3px 10px',border:`1px solid ${color}30`,borderRadius:100,color:color+'99',letterSpacing:'0.1em'}}>{label}</span>
+          ))}
+        </div>
+        <button onClick={handleClick} disabled={connecting} style={{width:'100%',padding:'15px',background:connecting?'rgba(184,255,0,0.04)':accent,color:connecting?accent:'#080909',border:connecting?`1px solid ${accent}55`:'none',borderRadius:6,fontSize:13,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:connecting?'not-allowed':'pointer',transition:'all 0.2s'}}>
+          {connecting ? '▸ Connecting...' : '▶  Connect Wallet / Enter'}
+        </button>
+        {err && <div style={{marginTop:14,fontSize:12,color:'#ff7070',background:'rgba(255,53,53,0.06)',border:'1px solid rgba(255,53,53,0.2)',borderRadius:4,padding:'10px 14px'}}>{err}</div>}
+        <div style={{marginTop:20,fontSize:10,color:'rgba(255,255,255,0.12)',lineHeight:1.7}}>Connects to Sepolia Testnet or Hardhat Local.<br/>Requires MetaMask.</div>
+      </div>
+      <div style={{position:'fixed',bottom:16,fontSize:9,letterSpacing:'0.1em',color:'rgba(255,255,255,0.08)'}}>SESSION SECURE · TLS 1.3 · AES-256 · ZK-PROOF · v4.1.0-mainnet</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ═══════════════════════════════════════════════════════════════
 function CountdownRing({ deadlineTs, totalSeconds }: { deadlineTs: number; totalSeconds: number }) {
   const { overdue, h, m, s, seconds } = useCountdown(deadlineTs);
   const R = 26, circ = 2 * Math.PI * R;
-  const pct = overdue ? 0 : Math.min(seconds / Math.max(totalSeconds, 1), 1);
+  const pct   = overdue ? 0 : Math.min(seconds / Math.max(totalSeconds, 1), 1);
   const color = overdue ? C.danger : seconds < 30 ? '#ffaa00' : C.accent;
-
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', minWidth:'72px' }}>
+    <div data-tour="countdown" style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', minWidth:'72px' }}>
       <svg width="60" height="60" style={{ transform:'rotate(-90deg)' }}>
         <circle cx="30" cy="30" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
         <circle cx="30" cy="30" r={R} fill="none" stroke={color} strokeWidth="3"
@@ -121,7 +172,6 @@ function CountdownRing({ deadlineTs, totalSeconds }: { deadlineTs: number; total
   );
 }
 
-// ── Toggle ────────────────────────────────────────────────────
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <div onClick={onChange} style={{ width:'34px', height:'19px', borderRadius:'100px', background: on ? 'rgba(184,255,0,0.25)' : 'rgba(255,255,255,0.07)', border: on ? '1px solid rgba(184,255,0,0.4)' : `1px solid ${C.border}`, position:'relative', cursor:'pointer', transition:'all 0.2s', flexShrink:0 }}>
@@ -130,7 +180,6 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   );
 }
 
-// ── Badge ─────────────────────────────────────────────────────
 function Badge({ state }: { state: TradeState }) {
   const map: Record<TradeState,[string,string]> = {
     Created:   ['rgba(120,120,255,0.1)','#9999ff'],
@@ -144,12 +193,9 @@ function Badge({ state }: { state: TradeState }) {
   return <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 10px', background:bg, color, border:`1px solid ${color}33`, borderRadius:'100px', fontSize:'10px', fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', fontFamily:C.mono }}>{state}</span>;
 }
 
-// ── Trade Card ────────────────────────────────────────────────
-function TradeCard({ trade, account, privacy, txLoading, onExec }: {
-  trade: Trade;
-  account: string;
-  privacy: boolean;
-  txLoading: string | null;
+function TradeCard({ trade, account, privacy, txLoading, chainId, onExec }: {
+  trade: Trade; account: string; privacy: boolean;
+  txLoading: string | null; chainId: number;
   onExec: (id: string, method: string, opts?: any) => void;
 }) {
   const { overdue } = useCountdown(trade.deadline);
@@ -157,7 +203,6 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
   const isSeller   = account.toLowerCase() === trade.seller.toLowerCase();
   const stateIdx   = STATE_LABELS.indexOf(trade.state);
   const isTerminal = trade.state === 'Completed' || trade.state === 'Cancelled';
-  // Slashing only valid on Funded or InTransit — Delivered state uses completeTrade instead
   const canSlash   = overdue && (trade.state === 'Funded' || trade.state === 'InTransit') && isBuyer && !trade.sellerSlashed;
   const isActing   = txLoading === trade.id;
   const totalSecs  = Math.max(trade.deadline - trade.createdAt, 1);
@@ -168,16 +213,15 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
         <span style={{ fontSize:'11px', color:C.dim, fontFamily:C.mono }}>ID {trade.id.slice(0,10)}…{trade.id.slice(-6)}</span>
         <Badge state={trade.state} />
       </div>
-
       {trade.state !== 'Cancelled' && (
         <div style={{ display:'flex', alignItems:'center', marginBottom:'18px', overflowX:'auto' }}>
           {(['Created','Funded','InTransit','Delivered','Completed'] as TradeState[]).map((s, i, arr) => {
             const past = stateIdx > i, act = stateIdx === i;
-            const col = past || act ? C.accent : 'rgba(255,255,255,0.1)';
+            const col  = past || act ? C.accent : 'rgba(255,255,255,0.1)';
             return (
               <div key={s} style={{ display:'flex', alignItems:'center', flex: i < arr.length-1 ? '1 1 auto' : '0 0 auto' }}>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
-                  <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:col, boxShadow: act ? `0 0 8px ${C.accent}` : 'none', transition:'all 0.3s' }} />
+                  <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:col, boxShadow: act ? `0 0 8px ${C.accent}` : 'none', animation: act && !isTerminal ? 'activePulse 2s ease-in-out infinite' : 'none', transition:'all 0.3s' }} />
                   <span style={{ fontSize:'8px', letterSpacing:'0.08em', color: act ? C.accent : past ? C.mid : C.dim, textTransform:'uppercase', whiteSpace:'nowrap', fontFamily:C.mono }}>{s}</span>
                 </div>
                 {i < arr.length-1 && <div style={{ flex:'1 1 auto', height:'1px', background: past ? C.accent : C.border, minWidth:'14px', marginBottom:'12px', transition:'background 0.3s' }} />}
@@ -186,7 +230,6 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
           })}
         </div>
       )}
-
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'20px', alignItems:'center', marginBottom:'14px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))', gap:'14px' }}>
           <div>
@@ -210,49 +253,46 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
         </div>
         {!isTerminal && <CountdownRing deadlineTs={trade.deadline} totalSeconds={totalSecs} />}
       </div>
-
       {!isTerminal && (
         <div style={S.actions}>
           {canSlash && (
             <button style={{ ...S.btnSlash, animation:'slashPulse 1.6s ease-in-out infinite' }}
-              onClick={() => onExec(trade.id, 'slashSellerAndComplete')} disabled={isActing}>
+              onClick={() => onExec(trade.id,'slashSellerAndComplete')} disabled={isActing}>
               {isActing ? '⏳ Processing…' : `⚡ INITIATE SLASHING PROTOCOL — SEIZE ${trade.slashingPenaltyBps/100}%`}
             </button>
           )}
           {isBuyer && trade.state === 'Created' && (
-            <button style={S.btnGhost} onClick={() => onExec(trade.id, 'fundTrade', { value: trade.amount })} disabled={isActing}>
+            <button style={S.btnGhost} onClick={() => onExec(trade.id,'fundTrade',{value:trade.amount})} disabled={isActing}>
               {isActing ? 'Processing…' : '[ Fund Escrow ]'}
             </button>
           )}
           {isBuyer && trade.state === 'Delivered' && (
-            <button style={{ ...S.btnPrimary, background: 'rgba(0,200,100,0.15)', color: '#00cc77', border: '1px solid rgba(0,200,100,0.4)' }}
-              onClick={() => onExec(trade.id, 'completeTrade')} disabled={isActing}>
+            <button style={{ ...S.btnGhost, color:C.accent, borderColor:'rgba(184,255,0,0.3)' }} onClick={() => onExec(trade.id,'completeTrade')} disabled={isActing}>
               {isActing ? 'Processing…' : '✓ Release Payment to Seller'}
             </button>
           )}
           {isBuyer && (trade.state === 'Created' || trade.state === 'Funded') && (
-            <button style={S.btnDanger} onClick={() => onExec(trade.id, 'cancelTrade')} disabled={isActing}>
+            <button style={S.btnDanger} onClick={() => onExec(trade.id,'cancelTrade')} disabled={isActing}>
               {isActing ? 'Processing…' : '[ Cancel Trade ]'}
             </button>
           )}
           {isSeller && trade.state === 'Funded' && (
-            <button style={S.btnGhost} onClick={() => onExec(trade.id, 'updateStatusInTransit')} disabled={isActing}>
+            <button style={S.btnGhost} onClick={() => onExec(trade.id,'updateStatusInTransit')} disabled={isActing}>
               {isActing ? 'Processing…' : '[ Mark In Transit ]'}
             </button>
           )}
           {isSeller && trade.state === 'InTransit' && (
-            <button style={S.btnGhost} onClick={() => onExec(trade.id, 'updateStatusDelivered')} disabled={isActing}>
+            <button style={S.btnGhost} onClick={() => onExec(trade.id,'updateStatusDelivered')} disabled={isActing}>
               {isActing ? 'Processing…' : '[ Confirm Delivery ]'}
             </button>
           )}
           {isSeller && trade.state === 'Created' && (
-            <button style={S.btnDanger} onClick={() => onExec(trade.id, 'cancelTrade')} disabled={isActing}>
+            <button style={S.btnDanger} onClick={() => onExec(trade.id,'cancelTrade')} disabled={isActing}>
               {isActing ? 'Processing…' : '[ Cancel Trade ]'}
             </button>
           )}
         </div>
       )}
-
       {trade.sellerSlashed && (
         <div style={{ marginTop:'10px', fontSize:'10px', color:C.danger, letterSpacing:'0.1em', textTransform:'uppercase' }}>
           ⚡ Slashing executed — {trade.slashingPenaltyBps/100}% seized from seller
@@ -262,39 +302,38 @@ function TradeCard({ trade, account, privacy, txLoading, onExec }: {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ROOT EXPORT
+// ═══════════════════════════════════════════════════════════════
 export default function Home() {
-  const [account,       setAccount]       = useState<string|null>(null);
-  const [trades,        setTrades]        = useState<Trade[]>([]);
-  const [loadingTrades, setLoadingTrades] = useState(false);
-  const [error,         setError]         = useState<string|null>(null);
-  const [success,       setSuccess]       = useState<string|null>(null);
-  const [loading,       setLoading]       = useState(false);
-  const [privacy,       setPrivacy]       = useState(false);
-  const [txLoading,     setTxLoading]     = useState<string|null>(null);
-  const [demoMode,      setDemoMode]      = useState(true);
-  const [showTour,      setShowTour]      = useState(false);
-
+  const [booted,        setBooted]       = useState(false);
+  // ── Screen type now includes 'vault' ─────────────────────────
+  const [screen,        setScreen]       = useState<'command'|'ledger'|'forge'|'warroom'|'vault'>('command');
+  const [showTour,      setShowTour]     = useState(false);
+  const [account,       setAccount]      = useState<string|null>(null);
+  const [chainId,       setChainId]      = useState<number>(31337);
+  const [trades,        setTrades]       = useState<Trade[]>([]);
+  const [loadingTrades, setLoadingTrades]= useState(false);
+  const [error,         setError]        = useState<string|null>(null);
+  const [lastTxHash,    setLastTxHash]   = useState<string|null>(null);
+  const [lastTxLabel,   setLastTxLabel]  = useState<string>('');
+  const [loading,       setLoading]      = useState(false);
+  const [privacy,       setPrivacy]      = useState(false);
+  const [txLoading,     setTxLoading]    = useState<string|null>(null);
+  const [demoMode,      setDemoMode]     = useState(true);
+  const [formOpen,      setFormOpen]     = useState(false);
   const [seller,   setSeller]   = useState('');
   const [amount,   setAmount]   = useState('');
   const [deadline, setDeadline] = useState('60');
   const [penalty,  setPenalty]  = useState('100');
 
-  // ── CHANGED: Sepolia (chainId 11155111) instead of Hardhat local ──
-  const getProvider = useCallback(() => {
-    const w = window as any;
-    return new ethers.providers.Web3Provider(w.ethereum, { chainId: 11155111, name: 'sepolia' });
-  }, []);
-
-  const getContract = useCallback((signer = false) => {
-    const p = getProvider();
-    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer ? p.getSigner() : p);
-  }, [getProvider]);
-
-  const loadTrades = useCallback(async (addr: string) => {
+  // ── Shared trade loader ───────────────────────────────────────
+  const loadTradesForAddr = useCallback(async (addr: string) => {
     try {
       setLoadingTrades(true);
-      const c = getContract();
+      const w = window as any;
+      const provider = new ethers.providers.Web3Provider(w.ethereum);
+      const c = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       const count = await c.getTradeCount();
       const total = Number(count);
       const loaded: Trade[] = [];
@@ -306,96 +345,45 @@ export default function Home() {
           if (t.buyer.toLowerCase() === addr.toLowerCase() || t.seller.toLowerCase() === addr.toLowerCase()) {
             loaded.push({ id, buyer:t.buyer, seller:t.seller, amount:t.amount.toString(), deadline:t.deadline.toNumber(), createdAt:t.createdAt.toNumber(), state, slashingPenaltyBps:t.slashingPenaltyBps, sellerSlashed:t.sellerSlashed });
           }
-        } catch { /* skip malformed */ }
+        } catch { /* skip bad trades */ }
       }
       setTrades(loaded.reverse());
     } catch { /* ignore */ }
     finally { setLoadingTrades(false); }
-  }, [getContract]);
+  }, []);
 
-  const connectWallet = async () => {
+  // ── Connect wallet ────────────────────────────────────────────
+  const connectWallet = useCallback(async () => {
     try {
       const w = window as any;
-      if (!w.ethereum) { setError('MetaMask not found.'); return; }
-      // ── CHANGED: Switch to Sepolia (0xaa36a7) instead of Hardhat (0x7a69) ──
+      if (!w.ethereum) { setError('MetaMask not found. Please install MetaMask and reload.'); setBooted(true); return; }
       try {
-        await w.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xaa36a7' }] });
+        await w.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:'0xaa36a7' }] });
       } catch (se: any) {
         if (se.code === 4902) {
-          await w.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0xaa36a7',
-              chainName: 'Sepolia Testnet',
-              rpcUrls: ['https://eth-sepolia.g.alchemy.com/v2/27oAgPRymuzZapzM6msqe'],
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
-            }],
-          });
+          await w.ethereum.request({ method:'wallet_addEthereumChain', params:[{ chainId:'0xaa36a7', chainName:'Sepolia Testnet', rpcUrls:['https://rpc.sepolia.org'], nativeCurrency:{ name:'ETH', symbol:'ETH', decimals:18 }, blockExplorerUrls:['https://sepolia.etherscan.io'] }]});
+        } else {
+          try { await w.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:'0x7a69' }] }); } catch { /* ignore */ }
         }
       }
-      const accs = await w.ethereum.request({ method: 'eth_requestAccounts' });
-      setAccount(accs[0]); setError(null);
-      await loadTrades(accs[0]);
-      // Show tour for first-time users
-      const toured = localStorage.getItem('iron-ledger-toured');
-      if (!toured) setShowTour(true);
+      const accs = await w.ethereum.request({ method:'eth_requestAccounts' });
+      const addr = accs[0];
+      const provider = new ethers.providers.Web3Provider(w.ethereum);
+      const network  = await provider.getNetwork();
+      setChainId(network.chainId);
+      setAccount(addr);
+      setError(null);
+      await loadTradesForAddr(addr);
+      if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
     } catch (e: any) {
       const m = String(e?.message || '');
       if (!m.includes('ENS') && !m.includes('getResolver')) setError('Failed: ' + m.slice(0, 100));
+    } finally {
+      setBooted(true);
     }
-  };
+  }, [loadTradesForAddr]);
 
-  const createTrade = async () => {
-    if (!seller || !amount || !deadline || !penalty) { setError('All fields required.'); return; }
-    try {
-      setLoading(true); setError(null); setSuccess(null);
-      const c = getContract(true);
-      const secs = demoMode ? parseInt(deadline) : parseInt(deadline) * 86400;
-      const deadlineTs = Math.floor(Date.now() / 1000) + secs;
-      const wei = ethers.utils.parseEther(amount);
-      const tx = await c.createTrade(seller, wei, deadlineTs, parseInt(penalty));
-      setSuccess('Submitted — confirming…');
-      await tx.wait();
-      setSuccess(`Trade created ✓  ${tx.hash.slice(0, 20)}…`);
-      setSeller(''); setAmount(''); setDeadline(demoMode ? '60' : '7'); setPenalty('100');
-      await loadTrades(account!);
-    } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0, 150)); }
-    finally { setLoading(false); }
-  };
-
-  const exec = async (id: string, method: string, opts: any = {}) => {
-    try {
-      setTxLoading(id); setError(null); setSuccess(null);
-      const c = getContract(true);
-      let tx;
-      if (method === 'fundTrade') {
-        // fundTrade(bytes32 id) — ETH value goes as tx override only
-        const valueWei = ethers.BigNumber.from(opts.value ?? '0');
-        tx = await c.fundTrade(id, { value: valueWei });
-      } else {
-        // All other methods: just pass the id, no extra args
-        tx = await c[method](id);
-      }
-      setSuccess('Submitted — confirming…');
-      await tx.wait();
-      setSuccess(`${method} confirmed ✓`);
-      await loadTrades(account!);
-    } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0, 150)); }
-    finally { setTxLoading(null); }
-  };
-
-  const handleTourDone = () => {
-    setShowTour(false);
-    localStorage.setItem('iron-ledger-toured', '1');
-  };
-
-  const nowSec     = Math.floor(Date.now() / 1000);
-  const active     = trades.filter(t => !['Completed','Cancelled'].includes(t.state)).length;
-  const lockedWei  = trades.filter(t => ['Funded','InTransit','Delivered'].includes(t.state)).reduce((a, t) => a + BigInt(t.amount), BigInt(0));
-  const lockedEth  = parseFloat(ethers.utils.formatEther(lockedWei.toString())).toFixed(3);
-  const overdueCnt = trades.filter(t => t.deadline < nowSec && ['Funded','InTransit'].includes(t.state)).length;
-
+  // ── Global styles ─────────────────────────────────────────────
   useEffect(() => {
     const l = document.createElement('link');
     l.href = 'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Serif+Display&display=swap';
@@ -409,51 +397,168 @@ export default function Home() {
       button:active{opacity:0.75}
       @keyframes slashPulse{0%,100%{box-shadow:0 0 18px rgba(255,53,53,0.1),inset 0 0 18px rgba(255,53,53,0.03)}50%{box-shadow:0 0 40px rgba(255,53,53,0.4),inset 0 0 30px rgba(255,53,53,0.08)}}
       @keyframes overdueFlash{0%,100%{opacity:1}50%{opacity:0.4}}
+      @keyframes activePulse{0%,100%{box-shadow:0 0 4px #b8ff00;transform:scale(1)}50%{box-shadow:0 0 12px #b8ff00,0 0 20px rgba(184,255,0,0.3);transform:scale(1.35)}}
+      @keyframes mapPulse{0%,100%{opacity:0.4;transform:scale(1)}50%{opacity:0.9;transform:scale(1.5)}}
+      @keyframes feedSlide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
       ::-webkit-scrollbar{width:3px;height:3px}
       ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px}
+      .gc-tab{cursor:pointer}
+      .gc-node-row:hover{background:rgba(255,255,255,0.02)!important}
     `;
     document.head.appendChild(s);
   }, []);
 
+  // ── Screen routing ────────────────────────────────────────────
+  if (!booted) return <TerminalBoot onAuthenticate={connectWallet} />;
+
+  if (screen === 'command') {
+    return (
+      <GlobalCommand
+        account={account || ''}
+        trades={trades}
+        onEnterLedger={() => setScreen('ledger')}
+      />
+    );
+  }
+
+  // ── War Room screen ───────────────────────────────────────────
+  if (screen === 'warroom') {
+    return (
+      <WarRoom
+        account={account || ''}
+        trades={trades}
+        onBack={() => setScreen('ledger')}
+        onTradeUpdate={() => { if (account) loadTradesForAddr(account); }}
+      />
+    );
+  }
+
+  // ── Vault screen ──────────────────────────────────────────────
+  if (screen === 'vault') {
+    return (
+      <TheVault
+        account={account || ''}
+        trades={trades}
+        onBack={() => setScreen('ledger')}
+      />
+    );
+  }
+
+  if (screen === 'forge') {
+    return (
+      <TheForge
+        account={account || ''}
+        trades={trades}
+        onBack={() => setScreen('ledger')}
+        onCreated={() => { if (account) loadTradesForAddr(account); }}
+      />
+    );
+  }
+
+  // ── Ledger screen ─────────────────────────────────────────────
+  const getProvider = () => new ethers.providers.Web3Provider((window as any).ethereum);
+  const getContract = (signer = false) => {
+    const p = getProvider();
+    return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer ? p.getSigner() : p);
+  };
+
+  const createTrade = async () => {
+    if (!seller || !amount || !deadline || !penalty) { setError('All fields required.'); return; }
+    try {
+      setLoading(true); setError(null); setLastTxHash(null);
+      const c = getContract(true);
+      const secs = demoMode ? parseInt(deadline) : parseInt(deadline) * 86400;
+      const deadlineTs = Math.floor(Date.now() / 1000) + secs;
+      const wei = ethers.utils.parseEther(amount);
+      const tx = await c.createTrade(seller, wei, deadlineTs, parseInt(penalty));
+      await tx.wait();
+      setLastTxHash(tx.hash); setLastTxLabel('Trade Created on Ethereum');
+      setSeller(''); setAmount(''); setDeadline(demoMode ? '60' : '7'); setPenalty('100');
+      setFormOpen(false);
+      await loadTradesForAddr(account!);
+    } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0,150)); }
+    finally { setLoading(false); }
+  };
+
+  const exec = async (id: string, method: string, opts: any = {}) => {
+    try {
+      setTxLoading(id); setError(null); setLastTxHash(null);
+      const c = getContract(true);
+      const tx = method === 'fundTrade'
+        ? await c.fundTrade(id, { value: ethers.BigNumber.from(opts.value || '0') })
+        : await c[method](id);
+      await tx.wait();
+      const labels: Record<string,string> = { fundTrade:'Escrow Funded', updateStatusInTransit:'Status: In Transit', updateStatusDelivered:'Status: Delivered', completeTrade:'Payment Released', cancelTrade:'Trade Cancelled', slashSellerAndComplete:'⚡ Slashing Executed' };
+      setLastTxHash(tx.hash); setLastTxLabel(labels[method] || method);
+      await loadTradesForAddr(account!);
+    } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0,150)); }
+    finally { setTxLoading(null); }
+  };
+
+  const nowSec      = Math.floor(Date.now() / 1000);
+  const active      = trades.filter(t => !['Completed','Cancelled'].includes(t.state)).length;
+  const lockedWei   = trades.filter(t => ['Funded','InTransit','Delivered'].includes(t.state)).reduce((a, t) => a + BigInt(t.amount), BigInt(0));
+  const lockedEth   = parseFloat(ethers.utils.formatEther(lockedWei.toString())).toFixed(3);
+  const overdueCnt  = trades.filter(t => t.deadline < nowSec && ['Funded','InTransit'].includes(t.state)).length;
+  const explorerUrl = lastTxHash ? getExplorerUrl(lastTxHash, chainId) : null;
+
   return (
     <>
-      {/* Tour overlay — renders above everything */}
-      {showTour && <IronLedgerTour onDone={handleTourDone} />}
-
+      {showTour && <OnboardingTour onComplete={() => setShowTour(false)} />}
+      <TourButton onClick={() => setShowTour(true)} />
       <div style={S.grid} />
       <main style={S.root}>
         <div style={S.page}>
-
-          {/* ── Header ── */}
-          <header data-tour="header" style={S.header}>
+          <header style={S.header}>
             <div style={S.hrow}>
               <div>
                 <div style={S.eyebrow}>Iron Ledger Protocol v1</div>
                 <h1 style={S.title}>The Iron Ledger</h1>
-                <p style={S.subtitle}>Autonomous Arbitration &amp; Escrow — On-Chain · Sepolia Testnet</p>
+                <p style={S.subtitle}>Autonomous Arbitration &amp; Escrow — On-Chain</p>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' as const }}>
+              <div style={{ display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' }}>
+                <button onClick={() => setScreen('command')} style={{ ...S.btnGhost, width:'auto', padding:'7px 14px', fontSize:10 }}>
+                  ← Command
+                </button>
+                {/* ── War Room button ── */}
+                <button
+                  onClick={() => setScreen('warroom')}
+                  style={{
+                    ...S.btnGhost,
+                    width: 'auto',
+                    padding: '7px 14px',
+                    fontSize: 10,
+                    color: overdueCnt > 0 ? C.danger : C.mid,
+                    borderColor: overdueCnt > 0 ? 'rgba(255,53,53,0.4)' : C.border,
+                    background: overdueCnt > 0 ? 'rgba(255,53,53,0.06)' : 'transparent',
+                    animation: overdueCnt > 0 ? 'slashPulse 1.6s ease-in-out infinite' : 'none',
+                  }}
+                >
+                  ⚔ War Room{overdueCnt > 0 ? ` (${overdueCnt}!)` : ''}
+                </button>
+                <button onClick={() => setScreen('forge')} style={{ ...S.btnGhost, width:'auto', padding:'7px 14px', fontSize:10, color:C.accent, borderColor:'rgba(184,255,0,0.3)' }}>
+                  ⚒ Forge
+                </button>
+                {/* ── Vault button ── */}
+                <button
+                  onClick={() => setScreen('vault')}
+                  style={{ ...S.btnGhost, width:'auto', padding:'7px 14px', fontSize:10, color:'#a78bfa', borderColor:'rgba(167,139,250,0.3)', background:'rgba(167,139,250,0.04)' }}
+                >
+                  ◈ Vault
+                </button>
                 {account && (
-                  <>
-                    <button
-                      style={S.tourBtn}
-                      onClick={() => setShowTour(true)}
-                      title="Replay guided tour"
-                    >
-                      ◎ Tour
-                    </button>
-                    <div style={S.chip}>
-                      <div style={S.chipDot} />
-                      <span style={{ fontSize:'12px', color:C.mid }}>{shortenAddr(account)}</span>
-                      <button style={S.chipX} onClick={() => { setAccount(null); setTrades([]); }}>✕</button>
-                    </div>
-                  </>
+                  <div data-tour="wallet" style={S.chip}>
+                    <div style={S.chipDot} />
+                    <span style={{ fontSize:'12px', color:C.mid }}>{shortenAddr(account)}</span>
+                    {chainId === 11155111 && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Sepolia</span>}
+                    {chainId === 31337    && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Local</span>}
+                    <button style={S.chipX} onClick={() => { setAccount(null); setTrades([]); setLastTxHash(null); }}>✕</button>
+                  </div>
                 )}
               </div>
             </div>
           </header>
 
-          {/* ── Connect screen ── */}
           {!account && (
             <div style={S.cwrap}>
               <div style={{ fontSize:'52px' }}>⚖</div>
@@ -461,17 +566,16 @@ export default function Home() {
                 <p style={{ ...S.title, margin:'0 0 8px' }}>Connect to The Iron Ledger</p>
                 <p style={{ fontSize:'13px', color:C.dim, margin:0, maxWidth:'340px', lineHeight:1.7 }}>
                   Trustless commodity escrow with live countdown enforcement.<br />
-                  MetaMask on Sepolia Testnet (chain 11155111).
+                  Connects to Sepolia Testnet or Hardhat Local.
                 </p>
               </div>
-              <button style={{ ...S.btnPrimary, width:'auto', padding:'14px 36px' }} onClick={connectWallet}>Connect Wallet</button>
+              <button data-tour="wallet" style={{ ...S.btnPrimary, width:'auto', padding:'14px 36px' }} onClick={connectWallet}>Connect Wallet</button>
               {error && <div style={{ ...S.alertErr, maxWidth:'400px' }}>{error}</div>}
             </div>
           )}
 
           {account && (
             <>
-              {/* ── Stats bar ── */}
               <div data-tour="stats" style={S.stats}>
                 <div style={S.statCell}>
                   <div style={S.statNum}>{active}</div>
@@ -487,77 +591,103 @@ export default function Home() {
                 </div>
               </div>
 
-              {error   && <div style={S.alertErr}>{error}</div>}
-              {success && <div style={S.alertOk}>{success}</div>}
+              {error && <div style={S.alertErr}>{error}</div>}
+              {lastTxHash && (
+                <div style={S.receipt}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                    <span style={{ fontSize:'14px' }}>✓</span>
+                    <span style={{ fontWeight:600 }}>{lastTxLabel}</span>
+                  </div>
+                  {explorerUrl
+                    ? <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ fontSize:'11px', color:C.accent, textDecoration:'none', border:`1px solid rgba(184,255,0,0.3)`, borderRadius:'4px', padding:'4px 10px', letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>View Receipt →</a>
+                    : <span style={{ fontSize:'10px', color:C.dim, fontFamily:C.mono }}>{lastTxHash.slice(0,16)}…</span>
+                  }
+                </div>
+              )}
 
-              {/* ── New Trade Panel ── */}
-              <div data-tour="new-trade" style={S.panel}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'22px' }}>
-                  <p style={{ fontSize:'14px', fontWeight:600, color:'#f0ede8', margin:0 }}>New Trade</p>
-                  <div data-tour="demo-toggle" style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                    <span style={{ fontSize:'10px', letterSpacing:'0.1em', color: demoMode ? C.accent : C.dim, textTransform:'uppercase' }}>
-                      {demoMode ? '⚡ Demo (seconds)' : '🏭 Production (days)'}
+              <div data-tour="create-form" style={S.panel}>
+                <div data-tour="demo-toggle" style={S.formToggle} onClick={() => setFormOpen(o => !o)}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                    <p style={{ fontSize:'14px', fontWeight:600, color:'#f0ede8', margin:0 }}>
+                      {formOpen ? '▾ New Trade' : '▸ New Trade'}
+                    </p>
+                    <span style={{ fontSize:'10px', letterSpacing:'0.1em', color: demoMode ? C.accent : C.dim, textTransform:'uppercase', background:'rgba(184,255,0,0.06)', border:'1px solid rgba(184,255,0,0.15)', borderRadius:'100px', padding:'2px 10px' }}>
+                      {demoMode ? '⚡ Demo' : '🏭 Production'}
                     </span>
+                    <span
+                      onClick={e => { e.stopPropagation(); setScreen('forge'); }}
+                      style={{ fontSize:'10px', color:C.accent, cursor:'pointer', textDecoration:'underline', letterSpacing:'0.08em' }}
+                    >
+                      ⚒ Open in Forge →
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px' }} onClick={e => e.stopPropagation()}>
+                    <span style={{ fontSize:'10px', color:C.dim, textTransform:'uppercase', letterSpacing:'0.08em' }}>{demoMode ? 'Seconds' : 'Days'}</span>
                     <Toggle on={demoMode} onChange={() => { setDemoMode(d => !d); setDeadline(demoMode ? '7' : '60'); }} />
                   </div>
                 </div>
-
-                <div style={S.fg}>
-                  <label style={S.lbl}>Seller Address</label>
-                  <input style={S.input} type="text" placeholder="0x…" value={seller} onChange={e => setSeller(e.target.value)} />
-                </div>
-                <div style={S.fg}>
-                  <label style={S.lbl}>Escrow Amount (ETH)</label>
-                  <input style={S.input} type="number" placeholder="0.1" value={amount} onChange={e => setAmount(e.target.value)} />
-                </div>
-                <div style={S.grid2}>
-                  <div>
-                    <label style={S.lbl}>Deadline ({demoMode ? 'seconds' : 'days'})</label>
-                    <input style={S.input} type="number" placeholder={demoMode ? '60' : '7'} value={deadline} onChange={e => setDeadline(e.target.value)} />
-                    <p style={S.hint}>{demoMode ? 'Live ring counts down to zero' : 'Days until delivery deadline'}</p>
-                  </div>
-                  <div>
-                    <label style={S.lbl}>Penalty (bps)</label>
-                    <input style={S.input} type="number" placeholder="100" value={penalty} onChange={e => setPenalty(e.target.value)} />
-                    <p style={S.hint}>100 bps = 1% | max 255</p>
-                  </div>
-                </div>
-
-                {demoMode && (
-                  <div data-tour="demo-hint" style={S.demoBox}>
-                    💡 <strong style={{ color:C.accent }}>Demo workflow:</strong> Set deadline to <strong style={{ color:C.accent }}>30</strong> seconds → Create Trade → Fund Escrow → watch the ring drain to zero → <strong style={{ color:C.danger }}>⚡ Slash button activates automatically</strong>. Note: Sepolia blocks confirm in ~12s so allow a few confirmations.
+                {formOpen && (
+                  <div style={{ marginTop:'20px' }}>
+                    <div style={S.fg}>
+                      <label style={S.lbl}>Seller Address</label>
+                      <input style={S.input} type="text" placeholder="0x…" value={seller} onChange={e => setSeller(e.target.value)} />
+                    </div>
+                    <div style={S.fg}>
+                      <label style={S.lbl}>Escrow Amount (ETH)</label>
+                      <input style={S.input} type="number" placeholder="0.1" value={amount} onChange={e => setAmount(e.target.value)} />
+                    </div>
+                    <div style={S.grid2}>
+                      <div>
+                        <label style={S.lbl}>Deadline ({demoMode ? 'seconds' : 'days'})</label>
+                        <input style={S.input} type="number" placeholder={demoMode ? '60' : '7'} value={deadline} onChange={e => setDeadline(e.target.value)} />
+                        <p style={S.hint}>{demoMode ? 'Live ring counts down to zero' : 'Days until delivery deadline'}</p>
+                      </div>
+                      <div>
+                        <label style={S.lbl}>Penalty (bps)</label>
+                        <input style={S.input} type="number" placeholder="100" value={penalty} onChange={e => setPenalty(e.target.value)} />
+                        <p style={S.hint}>100 bps = 1% | max 255</p>
+                      </div>
+                    </div>
+                    {demoMode && (
+                      <div style={S.demoBox}>
+                        💡 <strong style={{ color:C.accent }}>Demo:</strong> Set deadline to <strong style={{ color:C.accent }}>30</strong>s → Create → Fund → watch ring drain → <strong style={{ color:C.danger }}>⚡ Slash activates automatically</strong>.
+                      </div>
+                    )}
+                    <button style={{ ...S.btnPrimary, opacity:loading ? 0.6 : 1, cursor:loading ? 'not-allowed' : 'pointer' }} onClick={createTrade} disabled={loading}>
+                      {loading ? 'Submitting…' : 'Create Trade'}
+                    </button>
                   </div>
                 )}
-
-                <button
-                  style={{ ...S.btnPrimary, opacity:loading ? 0.6 : 1, cursor:loading ? 'not-allowed' : 'pointer' }}
-                  onClick={createTrade}
-                  disabled={loading}
-                >
-                  {loading ? 'Submitting…' : 'Create Trade'}
-                </button>
               </div>
 
-              {/* ── Active Ledger ── */}
               <div>
-                <div style={S.privRow}>
-                  <span data-tour="privacy-toggle" style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <span style={{ fontSize:'10px', letterSpacing:'0.12em', color:C.dim, textTransform:'uppercase' }}>Privacy Mode</span>
-                    <Toggle on={privacy} onChange={() => setPrivacy(p => !p)} />
-                  </span>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
+                  <div data-tour="ledger" style={S.secLbl}>Active Ledger</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
+                    {/* ── Vault shortcut in ledger ── */}
+                    <span
+                      onClick={() => setScreen('vault')}
+                      style={{ fontSize:'10px', color:'#a78bfa', cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, textDecoration:'underline' }}
+                    >
+                      ◈ My Vault →
+                    </span>
+                    <div data-tour="privacy" style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+                      <span style={{ fontSize:'10px', letterSpacing:'0.12em', color:C.dim, textTransform:'uppercase' as const }}>Privacy</span>
+                      <Toggle on={privacy} onChange={() => setPrivacy(p => !p)} />
+                    </div>
+                  </div>
                 </div>
-                <div data-tour="active-ledger" style={S.secLbl}>Active Ledger</div>
                 {loadingTrades && <div style={S.empty}>Loading trades from chain…</div>}
-                {!loadingTrades && trades.length === 0 && <div style={S.empty}>No trades found.<br />Create one above to begin.</div>}
+                {!loadingTrades && trades.length === 0 && (
+                  <div style={S.empty}>
+                    No trades found.<br />
+                    <span style={{ cursor:'pointer', color:C.accent, textDecoration:'underline' }} onClick={() => setScreen('forge')}>
+                      Open The Forge to create your first trade ↑
+                    </span>
+                  </div>
+                )}
                 {!loadingTrades && trades.map(t => (
-                  <TradeCard
-                    key={t.id}
-                    trade={t}
-                    account={account}
-                    privacy={privacy}
-                    txLoading={txLoading}
-                    onExec={exec}
-                  />
+                  <TradeCard key={t.id} trade={t} account={account} privacy={privacy} txLoading={txLoading} chainId={chainId} onExec={exec} />
                 ))}
               </div>
             </>
