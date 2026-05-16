@@ -82,7 +82,7 @@ const stateColor: Record<TradeState, string> = {
 };
 
 export default function WarRoom({ account, trades, onBack, onTradeUpdate }: WarRoomProps) {
-  const now                  = useNow();
+  const now                     = useNow();
   const [slashing, setSlashing] = useState<string | null>(null);
   const [log, setLog]           = useState<{ text: string; color: string; ts: string }[]>([]);
   const [error, setError]       = useState<string | null>(null);
@@ -112,11 +112,12 @@ export default function WarRoom({ account, trades, onBack, onTradeUpdate }: WarR
     .reduce((s, t) => s + BigInt(t.amount), BigInt(0));
 
   const executeSlash = async (trade: Trade) => {
-    (window as any).ethereum
+    const w = window as any;
+    if (!w.ethereum) return;
     setSlashing(trade.id); setError(null);
     addLog(`⚡ Initiating slash — ${trade.id.slice(0,10)}…`, C.orange);
     try {
-      const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+      const provider = new ethers.providers.Web3Provider(w.ethereum);
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider.getSigner());
       const tx = await contract.slashSellerAndComplete(trade.id);
       addLog(`📡 TX: ${tx.hash.slice(0,20)}…`, C.dim);
