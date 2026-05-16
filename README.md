@@ -3,7 +3,7 @@
 
 > Trustless commodity escrow with live countdown enforcement and automatic slashing. No middlemen. No banks. Just code.
 
-**Live Demo:** [the-iron-ledger-r1jzaz5xi-shrirammasalges-projects.vercel.app](https://the-iron-ledger-r1jzaz5xi-shrirammasalges-projects.vercel.app)  
+**Live Demo:** [[the-iron-ledger-r1jzaz5xi-shrirammasalges-projects.vercel.app](https://the-iron-ledger-r1jzaz5xi-shrirammasalges-projects.vercel.app)](https://the-iron-ledger.vercel.app/)  
 **Contract:** [`0xa8a37959d63C2A51e3eeF254a694cFDa7A67f1Aa`](https://sepolia.etherscan.io/address/0xa8a37959d63C2A51e3eeF254a694cFDa7A67f1Aa) on Sepolia Testnet
 
 ---
