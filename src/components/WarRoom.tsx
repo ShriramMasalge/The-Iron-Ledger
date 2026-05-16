@@ -112,7 +112,7 @@ export default function WarRoom({ account, trades, onBack, onTradeUpdate }: WarR
     .reduce((s, t) => s + BigInt(t.amount), BigInt(0));
 
   const executeSlash = async (trade: Trade) => {
-    if (!window.ethereum) return;
+    (window as any).ethereum
     setSlashing(trade.id); setError(null);
     addLog(`⚡ Initiating slash — ${trade.id.slice(0,10)}…`, C.orange);
     try {
