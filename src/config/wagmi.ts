@@ -4,7 +4,7 @@ import { injected, walletConnect } from 'wagmi/connectors';
 
 export const projectId = '8e7877fa5bc74c9a2d51e58450a544d7'; // from cloud.walletconnect.com
 
-export const wagmiConfig = createConfig({
+export const config = createConfig({
   chains: [hardhat, sepolia],
   connectors: [
     injected(),
