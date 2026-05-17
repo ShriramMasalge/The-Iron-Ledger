@@ -8,6 +8,13 @@ import GlobalCommand from '../components/GlobalCommand';
 import TheForge from '../components/TheForge';
 import WarRoom from '../components/WarRoom';
 import TheVault from '../components/TheVault';
+import {
+  useNotifications,
+  NotificationBell,
+  NotificationPanel,
+  NotificationToast,
+  NotificationStyles,
+} from '../components/NotificationSystem';
 
 type TradeState = 'Created' | 'Funded' | 'InTransit' | 'Delivered' | 'Completed' | 'Cancelled';
 
@@ -351,6 +358,26 @@ export default function Home() {
   const [deadline, setDeadline] = useState('60');
   const [penalty,  setPenalty]  = useState('100');
 
+  // ── Notifications ─────────────────────────────────────────────
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const [latestToast,    setLatestToast]    = useState<any>(null);
+  const {
+    permission,
+    requestPermission,
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    clearAll,
+  } = useNotifications(trades, account || '');
+
+  // Show toast whenever a new unread notification arrives
+  useEffect(() => {
+    if (notifications.length > 0 && !notifications[0].read) {
+      setLatestToast(notifications[0]);
+    }
+  }, [notifications]);
+
   const loadTradesForAddr = useCallback(async (addr: string) => {
     try {
       setLoadingTrades(true);
@@ -526,7 +553,13 @@ export default function Home() {
 
   return (
     <>
+      <NotificationStyles />
       {showTour && <OnboardingTour onComplete={() => setShowTour(false)} />}
+      {/* Toast */}
+      <NotificationToast
+        notification={latestToast}
+        onDismiss={() => setLatestToast(null)}
+      />
       <TourButton onClick={() => setShowTour(true)} />
       <div style={S.grid} />
       <main style={S.root}>
@@ -539,6 +572,28 @@ export default function Home() {
                 {!isMobile && <p style={S.subtitle}>Autonomous Escrow &amp; Settlement Protocol — On-Chain</p>}
               </div>
               <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
+                {/* Notification bell */}
+                {account && (
+                  <div style={{ position:'relative' }}>
+                    <NotificationBell
+                      unreadCount={unreadCount}
+                      onClick={() => setNotifPanelOpen(o => !o)}
+                      permission={permission}
+                      onRequestPermission={requestPermission}
+                    />
+                    {notifPanelOpen && (
+                      <NotificationPanel
+                        notifications={notifications}
+                        onMarkRead={markRead}
+                        onMarkAllRead={markAllRead}
+                        onClear={clearAll}
+                        onClose={() => setNotifPanelOpen(false)}
+                        permission={permission}
+                        onRequestPermission={requestPermission}
+                      />
+                    )}
+                  </div>
+                )}
                 {account && (
                   <div data-tour="wallet" style={{ ...S.chip, padding:'6px 12px 6px 8px' }}>
                     <div style={S.chipDot} />
