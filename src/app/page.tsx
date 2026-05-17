@@ -528,19 +528,22 @@ export default function Home() {
   // ── WalletConnect connect ─────────────────────────────────────
   const connectWalletConnect = useCallback(async () => {
     try {
-      // Dynamically import to avoid SSR issues
       const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
 
       const wcProvider = await EthereumProvider.init({
-        projectId: '8e7877fa5bc74c9a2d51e58450a544d7', // same as wagmi.ts
-        chains: [11155111], // Sepolia
+        projectId: '8e7877fa5bc74c9a2d51e58450a544d7',
+        chains: [11155111],
         optionalChains: [31337],
         showQrModal: true,
       });
 
       await wcProvider.connect();
 
-      const accounts = wcProvider.accounts;
+      // Try accounts from provider, fallback to eth_accounts request
+      let accounts: string[] = wcProvider.accounts || [];
+      if (!accounts.length) {
+        accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
+      }
       if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
 
       const addr = accounts[0];
@@ -551,15 +554,15 @@ export default function Home() {
       setAccount(addr);
       setConnType('walletconnect');
       setError(null);
+      (window as any).__wcProvider = wcProvider;
       await loadTradesForAddr(addr, wcProvider);
       if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
 
-      // Store provider for later use
-      (window as any).__wcProvider = wcProvider;
-
     } catch (e: any) {
       const m = String(e?.message || '');
-      if (!m.includes('closed') && !m.includes('rejected')) setError('WalletConnect failed: ' + m.slice(0, 100));
+      if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected')) {
+        setError('WalletConnect failed: ' + m.slice(0, 100));
+      }
     } finally {
       setBooted(true);
     }
