@@ -1,6 +1,6 @@
 import { Contract } from "ethers";
 
-export const CONTRACT_ADDRESS = "0xa8a37959d63C2A51e3eeF254a694cFDa7A67f1Aa";
+export const CONTRACT_ADDRESS = "0x1204c473186890B987B7Bb3e2b89d75FD73E3008";
 
 export const CONTRACT_ABI = [
   "function createTrade(address payable _seller, uint256 _amount, uint64 _deadline, uint8 _slashingPenaltyBps) returns (bytes32)",
