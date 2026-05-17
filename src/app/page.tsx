@@ -115,20 +115,86 @@ const S: Record<string, React.CSSProperties> = {
   formToggle: { display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', userSelect:'none' as const },
 };
 
+// ── WalletConnect modal ────────────────────────────────────────
+function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }: {
+  onClose: () => void;
+  onMetaMask: () => void;
+  onWalletConnect: () => void;
+  connecting: string | null;
+}) {
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={onClose}>
+      <div style={{ background:'#0f1011', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'12px', padding:'28px 24px', width:'100%', maxWidth:'360px', fontFamily:C.mono }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize:'10px', letterSpacing:'0.2em', color:C.accent, textTransform:'uppercase', marginBottom:'6px' }}>Connect Wallet</div>
+        <div style={{ fontSize:'18px', fontFamily:C.serif, color:'#f2ede6', fontWeight:700, marginBottom:'6px' }}>Choose Connection</div>
+        <div style={{ fontSize:'11px', color:C.dim, marginBottom:'24px', lineHeight:1.6 }}>
+          Use MetaMask extension on desktop, or WalletConnect to connect from any mobile browser.
+        </div>
+
+        {/* MetaMask option */}
+        <button
+          onClick={onMetaMask}
+          disabled={!!connecting}
+          style={{ width:'100%', padding:'16px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'10px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'metamask' ? 0.6 : 1 }}
+        >
+          <span style={{ fontSize:'24px' }}>🦊</span>
+          <div>
+            <div style={{ fontSize:'13px', fontWeight:600, color:'#f2ede6', marginBottom:'2px' }}>
+              {connecting === 'metamask' ? 'Connecting…' : 'MetaMask'}
+            </div>
+            <div style={{ fontSize:'10px', color:C.dim }}>Desktop browser extension</div>
+          </div>
+        </button>
+
+        {/* WalletConnect option */}
+        <button
+          onClick={onWalletConnect}
+          disabled={!!connecting}
+          style={{ width:'100%', padding:'16px', background:'rgba(56,189,248,0.04)', border:'1px solid rgba(56,189,248,0.2)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'20px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'walletconnect' ? 0.6 : 1 }}
+        >
+          <span style={{ fontSize:'24px' }}>📱</span>
+          <div>
+            <div style={{ fontSize:'13px', fontWeight:600, color:'#38bdf8', marginBottom:'2px' }}>
+              {connecting === 'walletconnect' ? 'Opening QR…' : 'WalletConnect'}
+            </div>
+            <div style={{ fontSize:'10px', color:C.dim }}>Mobile · Any browser · QR code</div>
+          </div>
+        </button>
+
+        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'transparent', border:`1px solid ${C.border}`, borderRadius:'6px', color:C.dim, fontFamily:C.mono, fontSize:'11px', cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' as const }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SPLASH GATE
 // ═══════════════════════════════════════════════════════════════
-function TerminalBoot({ onAuthenticate }: { onAuthenticate: () => void }) {
-  const [connecting, setConnecting] = useState(false);
+function TerminalBoot({ onAuthenticate, onWalletConnect }: {
+  onAuthenticate: () => void;
+  onWalletConnect: () => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const isMobile = useIsMobile();
   const mono = "'DM Mono','Courier New',monospace";
   const accent = '#b8ff00';
 
-  const handleClick = async () => {
-    setConnecting(true); setErr('');
+  const handleMetaMask = async () => {
+    setConnecting('metamask'); setErr('');
     try { await onAuthenticate(); }
-    catch { setErr('Connection failed. Try again.'); setConnecting(false); }
+    catch { setErr('MetaMask connection failed. Try again.'); }
+    finally { setConnecting(null); setShowModal(false); }
+  };
+
+  const handleWalletConnect = async () => {
+    setConnecting('walletconnect'); setErr('');
+    try { await onWalletConnect(); }
+    catch { setErr('WalletConnect failed. Try again.'); }
+    finally { setConnecting(null); setShowModal(false); }
   };
 
   return (
@@ -152,13 +218,40 @@ function TerminalBoot({ onAuthenticate }: { onAuthenticate: () => void }) {
             <span key={label} style={{fontSize:9,padding:'3px 10px',border:`1px solid ${color}30`,borderRadius:100,color:color+'99',letterSpacing:'0.1em'}}>{label}</span>
           ))}
         </div>
-        <button onClick={handleClick} disabled={connecting} style={{width:'100%',padding:'16px',background:connecting?'rgba(184,255,0,0.04)':accent,color:connecting?accent:'#080909',border:connecting?`1px solid ${accent}55`:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:connecting?'not-allowed':'pointer',transition:'all 0.2s',minHeight:'52px'}}>
-          {connecting ? '▸ Connecting...' : '▶  Connect Wallet / Enter'}
+
+        {/* Main connect button */}
+        <button
+          onClick={() => setShowModal(true)}
+          style={{width:'100%',padding:'16px',background:accent,color:'#080909',border:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:'pointer',transition:'all 0.2s',minHeight:'52px',marginBottom:'10px'}}
+        >
+          ▶  Connect Wallet / Enter
         </button>
+
+        {/* Mobile hint */}
+        {isMobile && (
+          <button
+            onClick={handleWalletConnect}
+            style={{width:'100%',padding:'12px',background:'rgba(56,189,248,0.06)',color:'#38bdf8',border:'1px solid rgba(56,189,248,0.25)',borderRadius:6,fontSize:12,fontWeight:600,letterSpacing:'0.08em',fontFamily:mono,cursor:'pointer',marginBottom:'10px'}}
+          >
+            📱 Connect via WalletConnect
+          </button>
+        )}
+
         {err && <div style={{marginTop:14,fontSize:12,color:'#ff7070',background:'rgba(255,53,53,0.06)',border:'1px solid rgba(255,53,53,0.2)',borderRadius:4,padding:'10px 14px'}}>{err}</div>}
-        <div style={{marginTop:20,fontSize:10,color:'rgba(255,255,255,0.12)',lineHeight:1.7}}>Connects to Sepolia Testnet or Hardhat Local.<br/>Requires MetaMask.</div>
+        <div style={{marginTop:16,fontSize:10,color:'rgba(255,255,255,0.12)',lineHeight:1.7}}>
+          MetaMask (desktop) or WalletConnect (mobile).<br/>Connects to Sepolia or Hardhat Local.
+        </div>
       </div>
       <div style={{position:'fixed',bottom:16,fontSize:9,letterSpacing:'0.1em',color:'rgba(255,255,255,0.08)',textAlign:'center',padding:'0 16px'}}>SESSION SECURE · TLS 1.3 · AES-256 · ZK-PROOF · v4.1.0-mainnet</div>
+
+      {showModal && (
+        <WalletSelectModal
+          onClose={() => setShowModal(false)}
+          onMetaMask={handleMetaMask}
+          onWalletConnect={handleWalletConnect}
+          connecting={connecting}
+        />
+      )}
     </div>
   );
 }
@@ -237,7 +330,6 @@ function TradeCard({ trade, account, privacy, txLoading, chainId, onExec, isMobi
         <Badge state={trade.state} />
       </div>
 
-      {/* Progress bar — hidden on mobile to save space */}
       {!isMobile && trade.state !== 'Cancelled' && (
         <div style={{ display:'flex', alignItems:'center', marginBottom:'18px', overflowX:'auto' }}>
           {(['Created','Funded','InTransit','Delivered','Completed'] as TradeState[]).map((s, i, arr) => {
@@ -357,6 +449,7 @@ export default function Home() {
   const [amount,   setAmount]   = useState('');
   const [deadline, setDeadline] = useState('60');
   const [penalty,  setPenalty]  = useState('100');
+  const [connType,      setConnType]     = useState<'metamask'|'walletconnect'|null>(null);
 
   // ── Notifications ─────────────────────────────────────────────
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
@@ -371,19 +464,17 @@ export default function Home() {
     clearAll,
   } = useNotifications(trades, account || '');
 
-  // Show toast whenever a new unread notification arrives
   useEffect(() => {
     if (notifications.length > 0 && !notifications[0].read) {
       setLatestToast(notifications[0]);
     }
   }, [notifications]);
 
-  const loadTradesForAddr = useCallback(async (addr: string) => {
+  const loadTradesForAddr = useCallback(async (addr: string, provider: any) => {
     try {
       setLoadingTrades(true);
-      const w = window as any;
-      const provider = new ethers.providers.Web3Provider(w.ethereum);
-      const c = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const ethProvider = new ethers.providers.Web3Provider(provider);
+      const c = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, ethProvider);
       const count = await c.getTradeCount();
       const total = Number(count);
       const loaded: Trade[] = [];
@@ -395,13 +486,14 @@ export default function Home() {
           if (t.buyer.toLowerCase() === addr.toLowerCase() || t.seller.toLowerCase() === addr.toLowerCase()) {
             loaded.push({ id, buyer:t.buyer, seller:t.seller, amount:t.amount.toString(), deadline:t.deadline.toNumber(), createdAt:t.createdAt.toNumber(), state, slashingPenaltyBps:t.slashingPenaltyBps, sellerSlashed:t.sellerSlashed });
           }
-        } catch { /* skip bad trades */ }
+        } catch { /* skip */ }
       }
       setTrades(loaded.reverse());
     } catch { /* ignore */ }
     finally { setLoadingTrades(false); }
   }, []);
 
+  // ── MetaMask connect ──────────────────────────────────────────
   const connectWallet = useCallback(async () => {
     try {
       const w = window as any;
@@ -421,12 +513,53 @@ export default function Home() {
       const network  = await provider.getNetwork();
       setChainId(network.chainId);
       setAccount(addr);
+      setConnType('metamask');
       setError(null);
-      await loadTradesForAddr(addr);
+      await loadTradesForAddr(addr, w.ethereum);
       if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
     } catch (e: any) {
       const m = String(e?.message || '');
       if (!m.includes('ENS') && !m.includes('getResolver')) setError('Failed: ' + m.slice(0, 100));
+    } finally {
+      setBooted(true);
+    }
+  }, [loadTradesForAddr]);
+
+  // ── WalletConnect connect ─────────────────────────────────────
+  const connectWalletConnect = useCallback(async () => {
+    try {
+      // Dynamically import to avoid SSR issues
+      const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
+
+      const wcProvider = await EthereumProvider.init({
+        projectId: '8e7877fa5bc74c9a2d51e58450a544d7', // same as wagmi.ts
+        chains: [11155111], // Sepolia
+        optionalChains: [31337],
+        showQrModal: true,
+      });
+
+      await wcProvider.connect();
+
+      const accounts = wcProvider.accounts;
+      if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
+
+      const addr = accounts[0];
+      const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
+      const network = await ethProvider.getNetwork();
+
+      setChainId(network.chainId);
+      setAccount(addr);
+      setConnType('walletconnect');
+      setError(null);
+      await loadTradesForAddr(addr, wcProvider);
+      if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
+
+      // Store provider for later use
+      (window as any).__wcProvider = wcProvider;
+
+    } catch (e: any) {
+      const m = String(e?.message || '');
+      if (!m.includes('closed') && !m.includes('rejected')) setError('WalletConnect failed: ' + m.slice(0, 100));
     } finally {
       setBooted(true);
     }
@@ -460,7 +593,19 @@ export default function Home() {
     document.head.appendChild(s);
   }, []);
 
-  if (!booted) return <TerminalBoot onAuthenticate={connectWallet} />;
+  const getProvider = () => {
+    if (connType === 'walletconnect' && (window as any).__wcProvider) {
+      return new ethers.providers.Web3Provider((window as any).__wcProvider);
+    }
+    return new ethers.providers.Web3Provider((window as any).ethereum);
+  };
+
+  if (!booted) return (
+    <TerminalBoot
+      onAuthenticate={connectWallet}
+      onWalletConnect={connectWalletConnect}
+    />
+  );
 
   if (screen === 'command') {
     return (
@@ -478,7 +623,7 @@ export default function Home() {
         account={account || ''}
         trades={trades}
         onBack={() => setScreen('ledger')}
-        onTradeUpdate={() => { if (account) loadTradesForAddr(account); }}
+        onTradeUpdate={() => { if (account) loadTradesForAddr(account, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum); }}
       />
     );
   }
@@ -499,13 +644,12 @@ export default function Home() {
         account={account || ''}
         trades={trades}
         onBack={() => setScreen('ledger')}
-        onCreated={() => { if (account) loadTradesForAddr(account); }}
+        onCreated={() => { if (account) loadTradesForAddr(account, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum); }}
       />
     );
   }
 
   // ── Ledger screen ─────────────────────────────────────────────
-  const getProvider = () => new ethers.providers.Web3Provider((window as any).ethereum);
   const getContract = (signer = false) => {
     const p = getProvider();
     return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer ? p.getSigner() : p);
@@ -524,7 +668,7 @@ export default function Home() {
       setLastTxHash(tx.hash); setLastTxLabel('Trade Created on Ethereum');
       setSeller(''); setAmount(''); setDeadline(demoMode ? '60' : '7'); setPenalty('100');
       setFormOpen(false);
-      await loadTradesForAddr(account!);
+      await loadTradesForAddr(account!, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum);
     } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0,150)); }
     finally { setLoading(false); }
   };
@@ -539,7 +683,7 @@ export default function Home() {
       await tx.wait();
       const labels: Record<string,string> = { fundTrade:'Escrow Funded', updateStatusInTransit:'Status: In Transit', updateStatusDelivered:'Status: Delivered', completeTrade:'Payment Released', cancelTrade:'Trade Cancelled', slashSellerAndComplete:'⚡ Slashing Executed' };
       setLastTxHash(tx.hash); setLastTxLabel(labels[method] || method);
-      await loadTradesForAddr(account!);
+      await loadTradesForAddr(account!, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum);
     } catch (e: any) { setError(String(e?.message || e?.reason || 'Failed').slice(0,150)); }
     finally { setTxLoading(null); }
   };
@@ -551,15 +695,19 @@ export default function Home() {
   const overdueCnt  = trades.filter(t => t.deadline < nowSec && ['Funded','InTransit'].includes(t.state)).length;
   const explorerUrl = lastTxHash ? getExplorerUrl(lastTxHash, chainId) : null;
 
+  const disconnect = () => {
+    if (connType === 'walletconnect' && (window as any).__wcProvider) {
+      (window as any).__wcProvider.disconnect();
+      (window as any).__wcProvider = null;
+    }
+    setAccount(null); setTrades([]); setLastTxHash(null); setConnType(null);
+  };
+
   return (
     <>
       <NotificationStyles />
       {showTour && <OnboardingTour onComplete={() => setShowTour(false)} />}
-      {/* Toast */}
-      <NotificationToast
-        notification={latestToast}
-        onDismiss={() => setLatestToast(null)}
-      />
+      <NotificationToast notification={latestToast} onDismiss={() => setLatestToast(null)} />
       <TourButton onClick={() => setShowTour(true)} />
       <div style={S.grid} />
       <main style={S.root}>
@@ -572,7 +720,6 @@ export default function Home() {
                 {!isMobile && <p style={S.subtitle}>Autonomous Escrow &amp; Settlement Protocol — On-Chain</p>}
               </div>
               <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
-                {/* Notification bell */}
                 {account && (
                   <div style={{ position:'relative' }}>
                     <NotificationBell
@@ -598,15 +745,15 @@ export default function Home() {
                   <div data-tour="wallet" style={{ ...S.chip, padding:'6px 12px 6px 8px' }}>
                     <div style={S.chipDot} />
                     <span style={{ fontSize:'11px', color:C.mid }}>{shortenAddr(account)}</span>
+                    {!isMobile && connType === 'walletconnect' && <span style={{ fontSize:'9px', color:'#38bdf8', marginLeft:'4px' }}>· WC</span>}
                     {!isMobile && chainId === 11155111 && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Sepolia</span>}
                     {!isMobile && chainId === 31337    && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Local</span>}
-                    <button style={S.chipX} onClick={() => { setAccount(null); setTrades([]); setLastTxHash(null); }}>✕</button>
+                    <button style={S.chipX} onClick={disconnect}>✕</button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Mobile nav — horizontal scroll */}
             <div className="mobile-nav-scroll" style={{ marginTop:'14px', display:'flex', gap:'8px', flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
               <button onClick={() => setScreen('command')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0 }}>
                 ← Overview
@@ -644,7 +791,14 @@ export default function Home() {
                   Trustless commodity escrow with live countdown enforcement.
                 </p>
               </div>
-              <button data-tour="wallet" style={{ ...S.btnPrimary, width:'auto', padding:'14px 36px' }} onClick={connectWallet}>Connect Wallet</button>
+              <div style={{ display:'flex', flexDirection:'column', gap:'10px', width:'100%', maxWidth:'320px' }}>
+                <button data-tour="wallet" style={{ ...S.btnPrimary }} onClick={connectWallet}>
+                  🦊 Connect MetaMask
+                </button>
+                <button style={{ ...S.btnGhost, color:'#38bdf8', borderColor:'rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.04)' }} onClick={connectWalletConnect}>
+                  📱 Connect via WalletConnect
+                </button>
+              </div>
               {error && <div style={{ ...S.alertErr, maxWidth:'400px' }}>{error}</div>}
             </div>
           )}

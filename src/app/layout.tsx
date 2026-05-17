@@ -1,21 +1,20 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Web3ProviderWrapper from "../components/Web3Provider";
+'use client';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from '../config/wagmi';
+import './globals.css';
 
-export const metadata: Metadata = {
-  title: "The Iron Ledger",
-  description: "Autonomous Arbitration and Escrow Protocol",
-};
+const queryClient = new QueryClient();
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Web3ProviderWrapper>{children}</Web3ProviderWrapper>
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        </WagmiProvider>
       </body>
     </html>
   );
