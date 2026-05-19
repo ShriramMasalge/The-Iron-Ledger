@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -130,8 +131,6 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
         <div style={{ fontSize:'11px', color:C.dim, marginBottom:'24px', lineHeight:1.6 }}>
           Use MetaMask extension on desktop, or WalletConnect to connect from any mobile browser.
         </div>
-
-        {/* MetaMask option */}
         <button
           onClick={onMetaMask}
           disabled={!!connecting}
@@ -145,8 +144,6 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
             <div style={{ fontSize:'10px', color:C.dim }}>Desktop browser extension</div>
           </div>
         </button>
-
-        {/* WalletConnect option */}
         <button
           onClick={onWalletConnect}
           disabled={!!connecting}
@@ -160,7 +157,6 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
             <div style={{ fontSize:'10px', color:C.dim }}>Mobile · Any browser · QR code</div>
           </div>
         </button>
-
         <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'transparent', border:`1px solid ${C.border}`, borderRadius:'6px', color:C.dim, fontFamily:C.mono, fontSize:'11px', cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' as const }}>
           Cancel
         </button>
@@ -218,16 +214,12 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
             <span key={label} style={{fontSize:9,padding:'3px 10px',border:`1px solid ${color}30`,borderRadius:100,color:color+'99',letterSpacing:'0.1em'}}>{label}</span>
           ))}
         </div>
-
-        {/* Main connect button */}
         <button
           onClick={() => setShowModal(true)}
           style={{width:'100%',padding:'16px',background:accent,color:'#080909',border:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:'pointer',transition:'all 0.2s',minHeight:'52px',marginBottom:'10px'}}
         >
           ▶  Connect Wallet / Enter
         </button>
-
-        {/* Mobile hint */}
         {isMobile && (
           <button
             onClick={handleWalletConnect}
@@ -236,14 +228,12 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
             📱 Connect via WalletConnect
           </button>
         )}
-
         {err && <div style={{marginTop:14,fontSize:12,color:'#ff7070',background:'rgba(255,53,53,0.06)',border:'1px solid rgba(255,53,53,0.2)',borderRadius:4,padding:'10px 14px'}}>{err}</div>}
         <div style={{marginTop:16,fontSize:10,color:'rgba(255,255,255,0.12)',lineHeight:1.7}}>
           MetaMask (desktop) or WalletConnect (mobile).<br/>Connects to Sepolia or Hardhat Local.
         </div>
       </div>
       <div style={{position:'fixed',bottom:16,fontSize:9,letterSpacing:'0.1em',color:'rgba(255,255,255,0.08)',textAlign:'center',padding:'0 16px'}}>SESSION SECURE · TLS 1.3 · AES-256 · ZK-PROOF · v4.1.0-mainnet</div>
-
       {showModal && (
         <WalletSelectModal
           onClose={() => setShowModal(false)}
@@ -329,7 +319,6 @@ function TradeCard({ trade, account, privacy, txLoading, chainId, onExec, isMobi
         <span style={{ fontSize:'11px', color:C.dim, fontFamily:C.mono }}>{isMobile ? `${trade.id.slice(0,8)}…` : `ID ${trade.id.slice(0,10)}…${trade.id.slice(-6)}`}</span>
         <Badge state={trade.state} />
       </div>
-
       {!isMobile && trade.state !== 'Cancelled' && (
         <div style={{ display:'flex', alignItems:'center', marginBottom:'18px', overflowX:'auto' }}>
           {(['Created','Funded','InTransit','Delivered','Completed'] as TradeState[]).map((s, i, arr) => {
@@ -347,7 +336,6 @@ function TradeCard({ trade, account, privacy, txLoading, chainId, onExec, isMobi
           })}
         </div>
       )}
-
       <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap:'16px', alignItems:'center', marginBottom:'14px' }}>
         <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit,minmax(110px,1fr))', gap:'12px' }}>
           <div>
@@ -375,7 +363,6 @@ function TradeCard({ trade, account, privacy, txLoading, chainId, onExec, isMobi
           </div>
         )}
       </div>
-
       {!isTerminal && (
         <div style={S.actions}>
           {canSlash && (
@@ -451,7 +438,6 @@ export default function Home() {
   const [penalty,  setPenalty]  = useState('100');
   const [connType,      setConnType]     = useState<'metamask'|'walletconnect'|null>(null);
 
-  // ── Notifications ─────────────────────────────────────────────
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [latestToast,    setLatestToast]    = useState<any>(null);
   const {
@@ -493,7 +479,6 @@ export default function Home() {
     finally { setLoadingTrades(false); }
   }, []);
 
-  // ── MetaMask connect ──────────────────────────────────────────
   const connectWallet = useCallback(async () => {
     try {
       const w = window as any;
@@ -525,31 +510,24 @@ export default function Home() {
     }
   }, [loadTradesForAddr]);
 
-  // ── WalletConnect connect ─────────────────────────────────────
   const connectWalletConnect = useCallback(async () => {
     try {
       const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
-
       const wcProvider = await EthereumProvider.init({
         projectId: '8e7877fa5bc74c9a2d51e58450a544d7',
         chains: [11155111],
         optionalChains: [31337],
         showQrModal: true,
       });
-
       await wcProvider.connect();
-
-      // Try accounts from provider, fallback to eth_accounts request
       let accounts: string[] = wcProvider.accounts || [];
       if (!accounts.length) {
         accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
       }
       if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
-
       const addr = accounts[0];
       const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
       const network = await ethProvider.getNetwork();
-
       setChainId(network.chainId);
       setAccount(addr);
       setConnType('walletconnect');
@@ -557,7 +535,6 @@ export default function Home() {
       (window as any).__wcProvider = wcProvider;
       await loadTradesForAddr(addr, wcProvider);
       if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
-
     } catch (e: any) {
       const m = String(e?.message || '');
       if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected')) {
@@ -641,6 +618,7 @@ export default function Home() {
     );
   }
 
+  // ── THE FIX: externalProvider passed to TheForge ──────────────
   if (screen === 'forge') {
     return (
       <TheForge
@@ -648,6 +626,7 @@ export default function Home() {
         trades={trades}
         onBack={() => setScreen('ledger')}
         onCreated={() => { if (account) loadTradesForAddr(account, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum); }}
+        externalProvider={connType === 'walletconnect' ? (window as any).__wcProvider : null}
       />
     );
   }
@@ -756,7 +735,6 @@ export default function Home() {
                 )}
               </div>
             </div>
-
             <div className="mobile-nav-scroll" style={{ marginTop:'14px', display:'flex', gap:'8px', flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
               <button onClick={() => setScreen('command')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0 }}>
                 ← Overview

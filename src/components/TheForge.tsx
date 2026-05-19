@@ -38,6 +38,7 @@ interface ForgeProps {
   trades: Trade[];
   onBack: () => void;
   onCreated: () => void;
+  getProvider: () => ethers.providers.Web3Provider; // ← ADDED
 }
 
 // ── Mobile hook ───────────────────────────────────────────────
@@ -211,7 +212,7 @@ function RecentRow({ trade }: { trade: Trade }) {
   );
 }
 
-export default function TheForge({ account, trades, onBack, onCreated }: ForgeProps) {
+export default function TheForge({ account, trades, onBack, onCreated, getProvider }: ForgeProps) {
   const isMobile = useIsMobile();
   const [seller,       setSeller]       = useState('');
   const [amountEth,    setAmountEth]    = useState('');
@@ -222,7 +223,6 @@ export default function TheForge({ account, trades, onBack, onCreated }: ForgePr
   const [error,        setError]        = useState('');
   const [success,      setSuccess]      = useState('');
   const [txHash,       setTxHash]       = useState('');
-  // Mobile accordion: which panel is open
   const [mobilePanel, setMobilePanel] = useState<'build'|'preview'|'history'>('build');
 
   const lbl: React.CSSProperties = { display:'block', fontSize:10, fontWeight:600, letterSpacing:'0.15em', color:C.dim, textTransform:'uppercase', marginBottom:8 };
@@ -232,8 +232,8 @@ export default function TheForge({ account, trades, onBack, onCreated }: ForgePr
     if (!seller || !amountEth || !deadlineSecs) { setError('Seller address, amount and deadline are required.'); return; }
     try {
       setLoading(true); setError(''); setSuccess(''); setTxHash('');
-      const w = window as any;
-      const provider = new ethers.providers.Web3Provider(w.ethereum);
+      // ← FIXED: use getProvider() instead of window.ethereum directly
+      const provider = getProvider();
       const signer = provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const secs = demoMode ? Number(deadlineSecs) : Number(deadlineSecs)*86400;
@@ -380,7 +380,7 @@ export default function TheForge({ account, trades, onBack, onCreated }: ForgePr
     );
   }
 
-  // ── Desktop layout (unchanged 3-column) ───────────────────────
+  // ── Desktop layout ────────────────────────────────────────────
   return (
     <>
       <style>{`
