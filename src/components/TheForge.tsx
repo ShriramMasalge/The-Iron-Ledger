@@ -38,7 +38,7 @@ interface ForgeProps {
   trades: Trade[];
   onBack: () => void;
   onCreated: () => void;
-  getProvider: () => ethers.providers.Web3Provider; // ← ADDED
+  externalProvider?: any; // WalletConnect provider or null (MetaMask uses window.ethereum)
 }
 
 // ── Mobile hook ───────────────────────────────────────────────
@@ -212,7 +212,7 @@ function RecentRow({ trade }: { trade: Trade }) {
   );
 }
 
-export default function TheForge({ account, trades, onBack, onCreated, getProvider }: ForgeProps) {
+export default function TheForge({ account, trades, onBack, onCreated, externalProvider }: ForgeProps) {
   const isMobile = useIsMobile();
   const [seller,       setSeller]       = useState('');
   const [amountEth,    setAmountEth]    = useState('');
@@ -223,16 +223,23 @@ export default function TheForge({ account, trades, onBack, onCreated, getProvid
   const [error,        setError]        = useState('');
   const [success,      setSuccess]      = useState('');
   const [txHash,       setTxHash]       = useState('');
-  const [mobilePanel, setMobilePanel] = useState<'build'|'preview'|'history'>('build');
+  const [mobilePanel,  setMobilePanel]  = useState<'build'|'preview'|'history'>('build');
 
   const lbl: React.CSSProperties = { display:'block', fontSize:10, fontWeight:600, letterSpacing:'0.15em', color:C.dim, textTransform:'uppercase', marginBottom:8 };
   const inp: React.CSSProperties = { width:'100%', padding:'13px 14px', background:'rgba(255,255,255,0.025)', border:`1px solid ${C.border}`, borderRadius:4, fontSize:16, color:C.text, fontFamily:C.mono, outline:'none', boxSizing:'border-box', transition:'border-color 0.15s' };
+
+  // ── Resolves the correct provider for both MetaMask and WalletConnect ──
+  const getProvider = () => {
+    if (externalProvider) {
+      return new ethers.providers.Web3Provider(externalProvider);
+    }
+    return new ethers.providers.Web3Provider((window as any).ethereum);
+  };
 
   const createTrade = async () => {
     if (!seller || !amountEth || !deadlineSecs) { setError('Seller address, amount and deadline are required.'); return; }
     try {
       setLoading(true); setError(''); setSuccess(''); setTxHash('');
-      // ← FIXED: use getProvider() instead of window.ethereum directly
       const provider = getProvider();
       const signer = provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
