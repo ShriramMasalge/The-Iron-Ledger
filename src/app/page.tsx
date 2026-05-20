@@ -519,13 +519,32 @@ export default function Home() {
         optionalChains: [31337],
         showQrModal: true,
       });
-     await wcProvider.connect();
-      // Switch mobile wallet to Sepolia
+      await wcProvider.connect();
+
+      // Give MetaMask mobile time to return to browser after QR scan
+      await new Promise(res => setTimeout(res, 1200));
+
+      // Retry getting accounts up to 5 times with delay
+      let accounts: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        accounts = wcProvider.accounts || [];
+        if (!accounts.length) {
+          accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
+        }
+        if (accounts.length) break;
+        await new Promise(res => setTimeout(res, 800));
+      }
+
+      if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
+      const addr = accounts[0];
+
+      // Switch to Sepolia AFTER accounts are confirmed
       try {
         await wcProvider.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0xaa36a7' }],
         });
+        await new Promise(res => setTimeout(res, 600));
       } catch (switchErr: any) {
         if (switchErr?.code === 4902 || switchErr?.message?.includes('Unrecognized')) {
           await wcProvider.request({
@@ -540,12 +559,7 @@ export default function Home() {
           });
         }
       }
-      let accounts: string[] = wcProvider.accounts || [];
-      if (!accounts.length) {
-        accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
-      }
-      if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
-      const addr = accounts[0];
+
       const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
       const network = await ethProvider.getNetwork();
       setChainId(network.chainId);
