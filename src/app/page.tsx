@@ -519,7 +519,27 @@ export default function Home() {
         optionalChains: [31337],
         showQrModal: true,
       });
-      await wcProvider.connect();
+     await wcProvider.connect();
+      // Switch mobile wallet to Sepolia
+      try {
+        await wcProvider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0xaa36a7' }],
+        });
+      } catch (switchErr: any) {
+        if (switchErr?.code === 4902 || switchErr?.message?.includes('Unrecognized')) {
+          await wcProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0xaa36a7',
+              chainName: 'Sepolia Testnet',
+              rpcUrls: ['https://rpc.sepolia.org'],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            }],
+          });
+        }
+      }
       let accounts: string[] = wcProvider.accounts || [];
       if (!accounts.length) {
         accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
