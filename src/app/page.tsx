@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -40,7 +39,6 @@ function getExplorerUrl(hash: string, chainId: number) {
   return null;
 }
 
-// ── Mobile hook ───────────────────────────────────────────────
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -166,7 +164,7 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SPLASH GATE
+// SPLASH GATE — with WalletConnect spinner
 // ═══════════════════════════════════════════════════════════════
 function TerminalBoot({ onAuthenticate, onWalletConnect }: {
   onAuthenticate: () => void;
@@ -193,14 +191,14 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
     finally { setConnecting(null); setShowModal(false); }
   };
 
-  // Full-screen loading state while WalletConnect is processing
+  // ── Full-screen spinner while WalletConnect is processing ──
   if (connecting === 'walletconnect') {
     return (
       <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, padding:'20px', gap:'28px' }}>
+        <style>{`@keyframes wcSpin{to{transform:rotate(360deg)}}`}</style>
         <div style={{ fontSize:36 }}>⚖</div>
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
           <div style={{ width:48, height:48, border:`3px solid rgba(184,255,0,0.12)`, borderTop:`3px solid ${accent}`, borderRadius:'50%', animation:'wcSpin 0.9s linear infinite' }} />
-          <style>{`@keyframes wcSpin{to{transform:rotate(360deg)}}`}</style>
           <div style={{ fontSize:14, color:accent, fontWeight:700, letterSpacing:'0.08em' }}>CONNECTING…</div>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', textAlign:'center', lineHeight:1.8, maxWidth:'280px' }}>
             Approve in MetaMask app<br/>
@@ -529,7 +527,12 @@ export default function Home() {
     }
   }, [loadTradesForAddr]);
 
+  // ── FIXED: fast WalletConnect with hard timeout, no chain switch hang ──
   const connectWalletConnect = useCallback(async () => {
+    const TIMEOUT = 12000;
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+
     try {
       const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
       const wcProvider = await EthereumProvider.init({
@@ -538,59 +541,40 @@ export default function Home() {
         optionalChains: [31337],
         showQrModal: true,
       });
+
+      // QR scan can take as long as the user needs — no timeout here
       await wcProvider.connect();
 
-      // Give MetaMask mobile time to return to browser after QR scan
-      await new Promise(res => setTimeout(res, 1200));
+      // Small delay for MetaMask mobile to return to browser
+      await new Promise(res => setTimeout(res, 800));
 
-      // Retry getting accounts up to 5 times with delay
-      let accounts: string[] = [];
-      for (let i = 0; i < 5; i++) {
-        accounts = wcProvider.accounts || [];
-        if (!accounts.length) {
-          accounts = await wcProvider.request({ method: 'eth_accounts' }) as string[];
-        }
-        if (accounts.length) break;
-        await new Promise(res => setTimeout(res, 800));
+      // Get accounts with timeout
+      let accounts: string[] = wcProvider.accounts || [];
+      if (!accounts.length) {
+        accounts = await withTimeout(
+          wcProvider.request({ method: 'eth_accounts' }) as Promise<string[]>,
+          TIMEOUT
+        );
       }
-
-      if (!accounts || accounts.length === 0) throw new Error('No accounts returned');
+      if (!accounts?.length) throw new Error('No accounts returned');
       const addr = accounts[0];
 
-      // Switch to Sepolia AFTER accounts are confirmed
-      try {
-        await wcProvider.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }],
-        });
-        await new Promise(res => setTimeout(res, 600));
-      } catch (switchErr: any) {
-        if (switchErr?.code === 4902 || switchErr?.message?.includes('Unrecognized')) {
-          await wcProvider.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0xaa36a7',
-              chainName: 'Sepolia Testnet',
-              rpcUrls: ['https://rpc.sepolia.org'],
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
-            }],
-          });
-        }
-      }
-
+      // Get network with timeout — skip wallet_switchEthereumChain (causes hang on mobile)
       const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
-      const network = await ethProvider.getNetwork();
+      const network = await withTimeout(ethProvider.getNetwork(), TIMEOUT);
+
       setChainId(network.chainId);
       setAccount(addr);
       setConnType('walletconnect');
       setError(null);
       (window as any).__wcProvider = wcProvider;
-      await loadTradesForAddr(addr, wcProvider);
+
+      // Load trades with timeout
+      await withTimeout(loadTradesForAddr(addr, wcProvider), TIMEOUT);
       if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
     } catch (e: any) {
       const m = String(e?.message || '');
-      if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected')) {
+      if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected') && !m.includes('timeout')) {
         setError('WalletConnect failed: ' + m.slice(0, 100));
       }
     } finally {
@@ -671,7 +655,6 @@ export default function Home() {
     );
   }
 
-  // ── THE FIX: externalProvider passed to TheForge ──────────────
   if (screen === 'forge') {
     return (
       <TheForge
