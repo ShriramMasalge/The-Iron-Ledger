@@ -521,13 +521,9 @@ export default function Home() {
         showQrModal: true,
       });
 
-      // QR scan can take as long as the user needs — no timeout here
       await wcProvider.connect();
-
-      // Small delay for MetaMask mobile to return to browser
       await new Promise(res => setTimeout(res, 800));
 
-      // Get accounts with timeout
       let accounts: string[] = wcProvider.accounts || [];
       if (!accounts.length) {
         accounts = await withTimeout(
@@ -538,13 +534,36 @@ export default function Home() {
       if (!accounts?.length) throw new Error('No accounts returned');
       const addr = accounts[0];
 
-      // Get network with timeout
+      // Try to switch to Sepolia — if it fails, still continue and validate after
+      try {
+        await wcProvider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0xaa36a7' }],
+        });
+        await new Promise(res => setTimeout(res, 600));
+      } catch (switchErr: any) {
+        // If chain not added, try to add it
+        try {
+          await wcProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0xaa36a7',
+              chainName: 'Sepolia Testnet',
+              rpcUrls: ['https://rpc.sepolia.org'],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            }],
+          });
+          await new Promise(res => setTimeout(res, 600));
+        } catch { /* ignore */ }
+      }
+
       const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
       const network = await withTimeout(ethProvider.getNetwork(), TIMEOUT);
 
-      // ── CHANGE 3: Chain validation — show clear error if wrong network ──
       if (network.chainId !== 11155111 && network.chainId !== 31337) {
-        setError('Wrong network. Please switch MetaMask to Sepolia, then reconnect.');
+        // Still wrong — show helpful error with direct link
+        setError('⚠ Switch MetaMask to Sepolia network, then tap Connect again.');
         setBooted(true);
         return;
       }
@@ -554,8 +573,6 @@ export default function Home() {
       setConnType('walletconnect');
       setError(null);
       (window as any).__wcProvider = wcProvider;
-
-      // Load trades with timeout
       await withTimeout(loadTradesForAddr(addr, wcProvider), TIMEOUT);
       if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
     } catch (e: any) {
