@@ -193,6 +193,25 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
     finally { setConnecting(null); setShowModal(false); }
   };
 
+  // Full-screen loading state while WalletConnect is processing
+  if (connecting === 'walletconnect') {
+    return (
+      <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, padding:'20px', gap:'28px' }}>
+        <div style={{ fontSize:36 }}>⚖</div>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+          <div style={{ width:48, height:48, border:`3px solid rgba(184,255,0,0.12)`, borderTop:`3px solid ${accent}`, borderRadius:'50%', animation:'wcSpin 0.9s linear infinite' }} />
+          <style>{`@keyframes wcSpin{to{transform:rotate(360deg)}}`}</style>
+          <div style={{ fontSize:14, color:accent, fontWeight:700, letterSpacing:'0.08em' }}>CONNECTING…</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', textAlign:'center', lineHeight:1.8, maxWidth:'280px' }}>
+            Approve in MetaMask app<br/>
+            then switch back to this browser tab.<br/>
+            <span style={{ color:'rgba(255,255,255,0.12)', fontSize:10 }}>This may take 10–20 seconds.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, backgroundImage:'linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)', backgroundSize:'52px 52px', padding:'20px' }}>
       <div style={{position:'fixed',top:0,left:0,width:28,height:28,borderTop:`2px solid ${accent}22`,borderLeft:`2px solid ${accent}22`}}/>
