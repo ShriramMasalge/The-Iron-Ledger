@@ -129,29 +129,19 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
         <div style={{ fontSize:'11px', color:C.dim, marginBottom:'24px', lineHeight:1.6 }}>
           Use MetaMask extension on desktop, or WalletConnect to connect from any mobile browser.
         </div>
-        <button
-          onClick={onMetaMask}
-          disabled={!!connecting}
-          style={{ width:'100%', padding:'16px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'10px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'metamask' ? 0.6 : 1 }}
-        >
+        <button onClick={onMetaMask} disabled={!!connecting}
+          style={{ width:'100%', padding:'16px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'10px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'metamask' ? 0.6 : 1 }}>
           <span style={{ fontSize:'24px' }}>🦊</span>
           <div>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'#f2ede6', marginBottom:'2px' }}>
-              {connecting === 'metamask' ? 'Connecting…' : 'MetaMask'}
-            </div>
+            <div style={{ fontSize:'13px', fontWeight:600, color:'#f2ede6', marginBottom:'2px' }}>{connecting === 'metamask' ? 'Connecting…' : 'MetaMask'}</div>
             <div style={{ fontSize:'10px', color:C.dim }}>Desktop browser extension</div>
           </div>
         </button>
-        <button
-          onClick={onWalletConnect}
-          disabled={!!connecting}
-          style={{ width:'100%', padding:'16px', background:'rgba(56,189,248,0.04)', border:'1px solid rgba(56,189,248,0.2)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'20px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'walletconnect' ? 0.6 : 1 }}
-        >
+        <button onClick={onWalletConnect} disabled={!!connecting}
+          style={{ width:'100%', padding:'16px', background:'rgba(56,189,248,0.04)', border:'1px solid rgba(56,189,248,0.2)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'20px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'walletconnect' ? 0.6 : 1 }}>
           <span style={{ fontSize:'24px' }}>📱</span>
           <div>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'#38bdf8', marginBottom:'2px' }}>
-              {connecting === 'walletconnect' ? 'Opening QR…' : 'WalletConnect'}
-            </div>
+            <div style={{ fontSize:'13px', fontWeight:600, color:'#38bdf8', marginBottom:'2px' }}>{connecting === 'walletconnect' ? 'Opening QR…' : 'WalletConnect'}</div>
             <div style={{ fontSize:'10px', color:C.dim }}>Mobile · Any browser · QR code</div>
           </div>
         </button>
@@ -164,7 +154,7 @@ function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }:
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SPLASH GATE — with WalletConnect spinner
+// SPLASH GATE — with WalletConnect spinner + step-by-step guide
 // ═══════════════════════════════════════════════════════════════
 function TerminalBoot({ onAuthenticate, onWalletConnect }: {
   onAuthenticate: () => void;
@@ -191,7 +181,7 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
     finally { setConnecting(null); setShowModal(false); }
   };
 
-  // ── Full-screen spinner while WalletConnect is processing ──
+  // ── CHANGE 1: Full-screen spinner with step-by-step guide ──
   if (connecting === 'walletconnect') {
     return (
       <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, padding:'20px', gap:'28px' }}>
@@ -200,10 +190,13 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
           <div style={{ width:48, height:48, border:`3px solid rgba(184,255,0,0.12)`, borderTop:`3px solid ${accent}`, borderRadius:'50%', animation:'wcSpin 0.9s linear infinite' }} />
           <div style={{ fontSize:14, color:accent, fontWeight:700, letterSpacing:'0.08em' }}>CONNECTING…</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', textAlign:'center', lineHeight:1.8, maxWidth:'280px' }}>
-            Approve in MetaMask app<br/>
-            then switch back to this browser tab.<br/>
-            <span style={{ color:'rgba(255,255,255,0.12)', fontSize:10 }}>This may take 10–20 seconds.</span>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textAlign:'center', lineHeight:2, maxWidth:'300px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'16px 20px' }}>
+            <div style={{ color:'rgba(184,255,0,0.8)', fontWeight:700, marginBottom:8, fontSize:10, letterSpacing:'0.15em' }}>FOLLOW THESE STEPS</div>
+            1. Scan QR in MetaMask app<br/>
+            2. <strong style={{ color:'#ffaa00' }}>Switch to Sepolia network</strong> in MetaMask<br/>
+            3. Tap Confirm / Connect<br/>
+            4. Switch back to this browser tab<br/>
+            <span style={{ color:'rgba(255,255,255,0.12)', fontSize:10 }}>Takes ~10–20 seconds total.</span>
           </div>
         </div>
       </div>
@@ -231,17 +224,13 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
             <span key={label} style={{fontSize:9,padding:'3px 10px',border:`1px solid ${color}30`,borderRadius:100,color:color+'99',letterSpacing:'0.1em'}}>{label}</span>
           ))}
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          style={{width:'100%',padding:'16px',background:accent,color:'#080909',border:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:'pointer',transition:'all 0.2s',minHeight:'52px',marginBottom:'10px'}}
-        >
+        <button onClick={() => setShowModal(true)}
+          style={{width:'100%',padding:'16px',background:accent,color:'#080909',border:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:'pointer',transition:'all 0.2s',minHeight:'52px',marginBottom:'10px'}}>
           ▶  Connect Wallet / Enter
         </button>
         {isMobile && (
-          <button
-            onClick={handleWalletConnect}
-            style={{width:'100%',padding:'12px',background:'rgba(56,189,248,0.06)',color:'#38bdf8',border:'1px solid rgba(56,189,248,0.25)',borderRadius:6,fontSize:12,fontWeight:600,letterSpacing:'0.08em',fontFamily:mono,cursor:'pointer',marginBottom:'10px'}}
-          >
+          <button onClick={handleWalletConnect}
+            style={{width:'100%',padding:'12px',background:'rgba(56,189,248,0.06)',color:'#38bdf8',border:'1px solid rgba(56,189,248,0.25)',borderRadius:6,fontSize:12,fontWeight:600,letterSpacing:'0.08em',fontFamily:mono,cursor:'pointer',marginBottom:'10px'}}>
             📱 Connect via WalletConnect
           </button>
         )}
@@ -458,19 +447,11 @@ export default function Home() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [latestToast,    setLatestToast]    = useState<any>(null);
   const {
-    permission,
-    requestPermission,
-    notifications,
-    unreadCount,
-    markRead,
-    markAllRead,
-    clearAll,
+    permission, requestPermission, notifications, unreadCount, markRead, markAllRead, clearAll,
   } = useNotifications(trades, account || '');
 
   useEffect(() => {
-    if (notifications.length > 0 && !notifications[0].read) {
-      setLatestToast(notifications[0]);
-    }
+    if (notifications.length > 0 && !notifications[0].read) setLatestToast(notifications[0]);
   }, [notifications]);
 
   const loadTradesForAddr = useCallback(async (addr: string, provider: any) => {
@@ -522,12 +503,10 @@ export default function Home() {
     } catch (e: any) {
       const m = String(e?.message || '');
       if (!m.includes('ENS') && !m.includes('getResolver')) setError('Failed: ' + m.slice(0, 100));
-    } finally {
-      setBooted(true);
-    }
+    } finally { setBooted(true); }
   }, [loadTradesForAddr]);
 
-  // ── FIXED: fast WalletConnect with hard timeout, no chain switch hang ──
+  // ── CHANGE 2: Fast WalletConnect — no chain-switch hang, hard timeout, chain validation ──
   const connectWalletConnect = useCallback(async () => {
     const TIMEOUT = 12000;
     const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
@@ -559,9 +538,16 @@ export default function Home() {
       if (!accounts?.length) throw new Error('No accounts returned');
       const addr = accounts[0];
 
-      // Get network with timeout — skip wallet_switchEthereumChain (causes hang on mobile)
+      // Get network with timeout
       const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
       const network = await withTimeout(ethProvider.getNetwork(), TIMEOUT);
+
+      // ── CHANGE 3: Chain validation — show clear error if wrong network ──
+      if (network.chainId !== 11155111 && network.chainId !== 31337) {
+        setError('Wrong network. Please switch MetaMask to Sepolia, then reconnect.');
+        setBooted(true);
+        return;
+      }
 
       setChainId(network.chainId);
       setAccount(addr);
@@ -577,9 +563,7 @@ export default function Home() {
       if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected') && !m.includes('timeout')) {
         setError('WalletConnect failed: ' + m.slice(0, 100));
       }
-    } finally {
-      setBooted(true);
-    }
+    } finally { setBooted(true); }
   }, [loadTradesForAddr]);
 
   useEffect(() => {
@@ -618,41 +602,22 @@ export default function Home() {
   };
 
   if (!booted) return (
-    <TerminalBoot
-      onAuthenticate={connectWallet}
-      onWalletConnect={connectWalletConnect}
-    />
+    <TerminalBoot onAuthenticate={connectWallet} onWalletConnect={connectWalletConnect} />
   );
 
   if (screen === 'command') {
-    return (
-      <GlobalCommand
-        account={account || ''}
-        trades={trades}
-        onEnterLedger={() => setScreen('ledger')}
-      />
-    );
+    return <GlobalCommand account={account || ''} trades={trades} onEnterLedger={() => setScreen('ledger')} />;
   }
 
   if (screen === 'warroom') {
     return (
-      <WarRoom
-        account={account || ''}
-        trades={trades}
-        onBack={() => setScreen('ledger')}
-        onTradeUpdate={() => { if (account) loadTradesForAddr(account, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum); }}
-      />
+      <WarRoom account={account || ''} trades={trades} onBack={() => setScreen('ledger')}
+        onTradeUpdate={() => { if (account) loadTradesForAddr(account, connType === 'walletconnect' ? (window as any).__wcProvider : (window as any).ethereum); }} />
     );
   }
 
   if (screen === 'vault') {
-    return (
-      <TheVault
-        account={account || ''}
-        trades={trades}
-        onBack={() => setScreen('ledger')}
-      />
-    );
+    return <TheVault account={account || ''} trades={trades} onBack={() => setScreen('ledger')} />;
   }
 
   if (screen === 'forge') {
@@ -740,22 +705,9 @@ export default function Home() {
               <div style={{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap' }}>
                 {account && (
                   <div style={{ position:'relative' }}>
-                    <NotificationBell
-                      unreadCount={unreadCount}
-                      onClick={() => setNotifPanelOpen(o => !o)}
-                      permission={permission}
-                      onRequestPermission={requestPermission}
-                    />
+                    <NotificationBell unreadCount={unreadCount} onClick={() => setNotifPanelOpen(o => !o)} permission={permission} onRequestPermission={requestPermission} />
                     {notifPanelOpen && (
-                      <NotificationPanel
-                        notifications={notifications}
-                        onMarkRead={markRead}
-                        onMarkAllRead={markAllRead}
-                        onClear={clearAll}
-                        onClose={() => setNotifPanelOpen(false)}
-                        permission={permission}
-                        onRequestPermission={requestPermission}
-                      />
+                      <NotificationPanel notifications={notifications} onMarkRead={markRead} onMarkAllRead={markAllRead} onClear={clearAll} onClose={() => setNotifPanelOpen(false)} permission={permission} onRequestPermission={requestPermission} />
                     )}
                   </div>
                 )}
@@ -772,30 +724,12 @@ export default function Home() {
               </div>
             </div>
             <div className="mobile-nav-scroll" style={{ marginTop:'14px', display:'flex', gap:'8px', flexWrap: isMobile ? 'nowrap' : 'wrap' }}>
-              <button onClick={() => setScreen('command')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0 }}>
-                ← Overview
-              </button>
-              <button
-                onClick={() => setScreen('warroom')}
-                style={{
-                  ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0,
-                  color: overdueCnt > 0 ? C.danger : C.mid,
-                  borderColor: overdueCnt > 0 ? 'rgba(255,53,53,0.4)' : C.border,
-                  background: overdueCnt > 0 ? 'rgba(255,53,53,0.06)' : 'transparent',
-                  animation: overdueCnt > 0 ? 'slashPulse 1.6s ease-in-out infinite' : 'none',
-                }}
-              >
+              <button onClick={() => setScreen('command')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0 }}>← Overview</button>
+              <button onClick={() => setScreen('warroom')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, flexShrink:0, color: overdueCnt > 0 ? C.danger : C.mid, borderColor: overdueCnt > 0 ? 'rgba(255,53,53,0.4)' : C.border, background: overdueCnt > 0 ? 'rgba(255,53,53,0.06)' : 'transparent', animation: overdueCnt > 0 ? 'slashPulse 1.6s ease-in-out infinite' : 'none' }}>
                 ⚠ Risk Monitor{overdueCnt > 0 ? ` (${overdueCnt}!)` : ''}
               </button>
-              <button onClick={() => setScreen('forge')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, color:C.accent, borderColor:'rgba(184,255,0,0.3)', flexShrink:0 }}>
-                ✦ Contract Drafting
-              </button>
-              <button
-                onClick={() => setScreen('vault')}
-                style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, color:'#a78bfa', borderColor:'rgba(167,139,250,0.3)', background:'rgba(167,139,250,0.04)', flexShrink:0 }}
-              >
-                ◈ Performance Analytics
-              </button>
+              <button onClick={() => setScreen('forge')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, color:C.accent, borderColor:'rgba(184,255,0,0.3)', flexShrink:0 }}>✦ Contract Drafting</button>
+              <button onClick={() => setScreen('vault')} style={{ ...S.btnGhost, width:'auto', padding:'8px 14px', fontSize:10, color:'#a78bfa', borderColor:'rgba(167,139,250,0.3)', background:'rgba(167,139,250,0.04)', flexShrink:0 }}>◈ Performance Analytics</button>
             </div>
           </header>
 
@@ -804,17 +738,11 @@ export default function Home() {
               <div style={{ fontSize:'48px' }}>⚖</div>
               <div>
                 <p style={{ ...S.title, margin:'0 0 8px', fontSize: isMobile ? '20px' : '26px' }}>Connect to The Iron Ledger</p>
-                <p style={{ fontSize:'13px', color:C.dim, margin:0, maxWidth:'340px', lineHeight:1.7 }}>
-                  Trustless commodity escrow with live countdown enforcement.
-                </p>
+                <p style={{ fontSize:'13px', color:C.dim, margin:0, maxWidth:'340px', lineHeight:1.7 }}>Trustless commodity escrow with live countdown enforcement.</p>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:'10px', width:'100%', maxWidth:'320px' }}>
-                <button data-tour="wallet" style={{ ...S.btnPrimary }} onClick={connectWallet}>
-                  🦊 Connect MetaMask
-                </button>
-                <button style={{ ...S.btnGhost, color:'#38bdf8', borderColor:'rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.04)' }} onClick={connectWalletConnect}>
-                  📱 Connect via WalletConnect
-                </button>
+                <button data-tour="wallet" style={{ ...S.btnPrimary }} onClick={connectWallet}>🦊 Connect MetaMask</button>
+                <button style={{ ...S.btnGhost, color:'#38bdf8', borderColor:'rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.04)' }} onClick={connectWalletConnect}>📱 Connect via WalletConnect</button>
               </div>
               {error && <div style={{ ...S.alertErr, maxWidth:'400px' }}>{error}</div>}
             </div>
@@ -823,18 +751,9 @@ export default function Home() {
           {account && (
             <>
               <div data-tour="stats" style={S.stats}>
-                <div style={S.statCell}>
-                  <div style={S.statNum}>{active}</div>
-                  <div style={S.statLbl}>Active</div>
-                </div>
-                <div style={S.statCell}>
-                  <div style={{ ...S.statNum, ...(privacy ? S.blur : {}) }}>{lockedEth} ETH</div>
-                  <div style={S.statLbl}>Escrow</div>
-                </div>
-                <div style={S.statCell}>
-                  <div style={{ ...S.statNum, color: overdueCnt > 0 ? C.danger : C.accent }}>{overdueCnt}</div>
-                  <div style={S.statLbl}>Overdue</div>
-                </div>
+                <div style={S.statCell}><div style={S.statNum}>{active}</div><div style={S.statLbl}>Active</div></div>
+                <div style={S.statCell}><div style={{ ...S.statNum, ...(privacy ? S.blur : {}) }}>{lockedEth} ETH</div><div style={S.statLbl}>Escrow</div></div>
+                <div style={S.statCell}><div style={{ ...S.statNum, color: overdueCnt > 0 ? C.danger : C.accent }}>{overdueCnt}</div><div style={S.statLbl}>Overdue</div></div>
               </div>
 
               {error && <div style={S.alertErr}>{error}</div>}
@@ -854,17 +773,12 @@ export default function Home() {
               <div data-tour="create-form" style={S.panel}>
                 <div data-tour="demo-toggle" style={S.formToggle} onClick={() => setFormOpen(o => !o)}>
                   <div style={{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' }}>
-                    <p style={{ fontSize:'14px', fontWeight:600, color:'#f0ede8', margin:0 }}>
-                      {formOpen ? '▾ New Trade' : '▸ New Trade'}
-                    </p>
+                    <p style={{ fontSize:'14px', fontWeight:600, color:'#f0ede8', margin:0 }}>{formOpen ? '▾ New Trade' : '▸ New Trade'}</p>
                     <span style={{ fontSize:'10px', letterSpacing:'0.1em', color: demoMode ? C.accent : C.dim, textTransform:'uppercase', background:'rgba(184,255,0,0.06)', border:'1px solid rgba(184,255,0,0.15)', borderRadius:'100px', padding:'2px 10px' }}>
                       {demoMode ? '⚡ Demo' : '🏭 Prod'}
                     </span>
                     {!isMobile && (
-                      <span
-                        onClick={e => { e.stopPropagation(); setScreen('forge'); }}
-                        style={{ fontSize:'10px', color:C.accent, cursor:'pointer', textDecoration:'underline', letterSpacing:'0.08em' }}
-                      >
+                      <span onClick={e => { e.stopPropagation(); setScreen('forge'); }} style={{ fontSize:'10px', color:C.accent, cursor:'pointer', textDecoration:'underline', letterSpacing:'0.08em' }}>
                         ✦ Open in Contract Drafting →
                       </span>
                     )}
@@ -912,12 +826,7 @@ export default function Home() {
                   <div data-tour="ledger" style={S.secLbl}>Active Ledger</div>
                   <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
                     {!isMobile && (
-                      <span
-                        onClick={() => setScreen('vault')}
-                        style={{ fontSize:'10px', color:'#a78bfa', cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, textDecoration:'underline' }}
-                      >
-                        ◈ My Analytics →
-                      </span>
+                      <span onClick={() => setScreen('vault')} style={{ fontSize:'10px', color:'#a78bfa', cursor:'pointer', letterSpacing:'0.1em', textTransform:'uppercase' as const, textDecoration:'underline' }}>◈ My Analytics →</span>
                     )}
                     <div data-tour="privacy" style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                       <span style={{ fontSize:'10px', letterSpacing:'0.12em', color:C.dim, textTransform:'uppercase' as const }}>Privacy</span>
