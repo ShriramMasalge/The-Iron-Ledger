@@ -114,75 +114,27 @@ const S: Record<string, React.CSSProperties> = {
   formToggle: { display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', userSelect:'none' as const },
 };
 
-// ── WalletConnect modal ────────────────────────────────────────
-function WalletSelectModal({ onClose, onMetaMask, onWalletConnect, connecting }: {
-  onClose: () => void;
-  onMetaMask: () => void;
-  onWalletConnect: () => void;
-  connecting: string | null;
-}) {
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={onClose}>
-      <div style={{ background:'#0f1011', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'12px', padding:'28px 24px', width:'100%', maxWidth:'360px', fontFamily:C.mono }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize:'10px', letterSpacing:'0.2em', color:C.accent, textTransform:'uppercase', marginBottom:'6px' }}>Connect Wallet</div>
-        <div style={{ fontSize:'18px', fontFamily:C.serif, color:'#f2ede6', fontWeight:700, marginBottom:'6px' }}>Choose Connection</div>
-        <div style={{ fontSize:'11px', color:C.dim, marginBottom:'24px', lineHeight:1.6 }}>
-          Use MetaMask extension on desktop, or WalletConnect to connect from any mobile browser.
-        </div>
-        <button onClick={onMetaMask} disabled={!!connecting}
-          style={{ width:'100%', padding:'16px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'10px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'metamask' ? 0.6 : 1 }}>
-          <span style={{ fontSize:'24px' }}>🦊</span>
-          <div>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'#f2ede6', marginBottom:'2px' }}>{connecting === 'metamask' ? 'Connecting…' : 'MetaMask'}</div>
-            <div style={{ fontSize:'10px', color:C.dim }}>Desktop browser extension</div>
-          </div>
-        </button>
-        <button onClick={onWalletConnect} disabled={!!connecting}
-          style={{ width:'100%', padding:'16px', background:'rgba(56,189,248,0.04)', border:'1px solid rgba(56,189,248,0.2)', borderRadius:'8px', color:C.text, fontFamily:C.mono, cursor:'pointer', marginBottom:'20px', display:'flex', alignItems:'center', gap:'14px', textAlign:'left' as const, opacity: connecting === 'walletconnect' ? 0.6 : 1 }}>
-          <span style={{ fontSize:'24px' }}>📱</span>
-          <div>
-            <div style={{ fontSize:'13px', fontWeight:600, color:'#38bdf8', marginBottom:'2px' }}>{connecting === 'walletconnect' ? 'Opening QR…' : 'WalletConnect'}</div>
-            <div style={{ fontSize:'10px', color:C.dim }}>Mobile · Any browser · QR code</div>
-          </div>
-        </button>
-        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'transparent', border:`1px solid ${C.border}`, borderRadius:'6px', color:C.dim, fontFamily:C.mono, fontSize:'11px', cursor:'pointer', letterSpacing:'0.08em', textTransform:'uppercase' as const }}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════
-// SPLASH GATE — with WalletConnect spinner + step-by-step guide
+// SPLASH GATE — MetaMask only, no WalletConnect shortcut
 // ═══════════════════════════════════════════════════════════════
 function TerminalBoot({ onAuthenticate, onWalletConnect }: {
   onAuthenticate: () => void;
   onWalletConnect: () => void;
 }) {
-  const [showModal, setShowModal] = useState(false);
-  const [connecting, setConnecting] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [err, setErr] = useState('');
   const isMobile = useIsMobile();
   const mono = "'DM Mono','Courier New',monospace";
   const accent = '#b8ff00';
 
-  const handleMetaMask = async () => {
-    setConnecting('metamask'); setErr('');
+  const handleConnect = async () => {
+    setConnecting(true); setErr('');
     try { await onAuthenticate(); }
-    catch { setErr('MetaMask connection failed. Try again.'); }
-    finally { setConnecting(null); setShowModal(false); }
+    catch { setErr('Connection failed. Try again.'); }
+    finally { setConnecting(false); }
   };
 
-  const handleWalletConnect = async () => {
-    setConnecting('walletconnect'); setErr('');
-    try { await onWalletConnect(); }
-    catch { setErr('WalletConnect failed. Try again.'); }
-    finally { setConnecting(null); setShowModal(false); }
-  };
-
-  // ── CHANGE 1: Full-screen spinner with step-by-step guide ──
-  if (connecting === 'walletconnect') {
+  if (connecting) {
     return (
       <div style={{ minHeight:'100vh', background:'#080909', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:mono, padding:'20px', gap:'28px' }}>
         <style>{`@keyframes wcSpin{to{transform:rotate(360deg)}}`}</style>
@@ -190,13 +142,8 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
           <div style={{ width:48, height:48, border:`3px solid rgba(184,255,0,0.12)`, borderTop:`3px solid ${accent}`, borderRadius:'50%', animation:'wcSpin 0.9s linear infinite' }} />
           <div style={{ fontSize:14, color:accent, fontWeight:700, letterSpacing:'0.08em' }}>CONNECTING…</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textAlign:'center', lineHeight:2, maxWidth:'300px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'16px 20px' }}>
-            <div style={{ color:'rgba(184,255,0,0.8)', fontWeight:700, marginBottom:8, fontSize:10, letterSpacing:'0.15em' }}>FOLLOW THESE STEPS</div>
-            1. Scan QR in MetaMask app<br/>
-            2. <strong style={{ color:'#ffaa00' }}>Switch to Sepolia network</strong> in MetaMask<br/>
-            3. Tap Confirm / Connect<br/>
-            4. Switch back to this browser tab<br/>
-            <span style={{ color:'rgba(255,255,255,0.12)', fontSize:10 }}>Takes ~10–20 seconds total.</span>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.25)', textAlign:'center', lineHeight:1.8 }}>
+            Approve in MetaMask, then return here.
           </div>
         </div>
       </div>
@@ -224,30 +171,16 @@ function TerminalBoot({ onAuthenticate, onWalletConnect }: {
             <span key={label} style={{fontSize:9,padding:'3px 10px',border:`1px solid ${color}30`,borderRadius:100,color:color+'99',letterSpacing:'0.1em'}}>{label}</span>
           ))}
         </div>
-        <button onClick={() => setShowModal(true)}
+        <button onClick={handleConnect}
           style={{width:'100%',padding:'16px',background:accent,color:'#080909',border:'none',borderRadius:6,fontSize:14,fontWeight:700,letterSpacing:'0.1em',textTransform:'uppercase',fontFamily:mono,cursor:'pointer',transition:'all 0.2s',minHeight:'52px',marginBottom:'10px'}}>
-          ▶  Connect Wallet / Enter
+          🦊 Connect MetaMask / Enter
         </button>
-        {isMobile && (
-          <button onClick={handleWalletConnect}
-            style={{width:'100%',padding:'12px',background:'rgba(56,189,248,0.06)',color:'#38bdf8',border:'1px solid rgba(56,189,248,0.25)',borderRadius:6,fontSize:12,fontWeight:600,letterSpacing:'0.08em',fontFamily:mono,cursor:'pointer',marginBottom:'10px'}}>
-            📱 Connect via WalletConnect
-          </button>
-        )}
         {err && <div style={{marginTop:14,fontSize:12,color:'#ff7070',background:'rgba(255,53,53,0.06)',border:'1px solid rgba(255,53,53,0.2)',borderRadius:4,padding:'10px 14px'}}>{err}</div>}
         <div style={{marginTop:16,fontSize:10,color:'rgba(255,255,255,0.12)',lineHeight:1.7}}>
-          MetaMask (desktop) or WalletConnect (mobile).<br/>Connects to Sepolia or Hardhat Local.
+          Connects to Sepolia testnet via MetaMask.
         </div>
       </div>
       <div style={{position:'fixed',bottom:16,fontSize:9,letterSpacing:'0.1em',color:'rgba(255,255,255,0.08)',textAlign:'center',padding:'0 16px'}}>SESSION SECURE · TLS 1.3 · AES-256 · ZK-PROOF · v4.1.0-mainnet</div>
-      {showModal && (
-        <WalletSelectModal
-          onClose={() => setShowModal(false)}
-          onMetaMask={handleMetaMask}
-          onWalletConnect={handleWalletConnect}
-          connecting={connecting}
-        />
-      )}
     </div>
   );
 }
@@ -506,82 +439,8 @@ export default function Home() {
     } finally { setBooted(true); }
   }, [loadTradesForAddr]);
 
-  // ── CHANGE 2: Fast WalletConnect — no chain-switch hang, hard timeout, chain validation ──
-  const connectWalletConnect = useCallback(async () => {
-    const TIMEOUT = 12000;
-    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
-      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
-
-    try {
-      const { EthereumProvider } = await import('@walletconnect/ethereum-provider');
-      const wcProvider = await EthereumProvider.init({
-        projectId: '8e7877fa5bc74c9a2d51e58450a544d7',
-        chains: [11155111],
-        optionalChains: [31337],
-        showQrModal: true,
-      });
-
-      await wcProvider.connect();
-      await new Promise(res => setTimeout(res, 800));
-
-      let accounts: string[] = wcProvider.accounts || [];
-      if (!accounts.length) {
-        accounts = await withTimeout(
-          wcProvider.request({ method: 'eth_accounts' }) as Promise<string[]>,
-          TIMEOUT
-        );
-      }
-      if (!accounts?.length) throw new Error('No accounts returned');
-      const addr = accounts[0];
-
-      // Try to switch to Sepolia — if it fails, still continue and validate after
-      try {
-        await wcProvider.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }],
-        });
-        await new Promise(res => setTimeout(res, 600));
-      } catch (switchErr: any) {
-        // If chain not added, try to add it
-        try {
-          await wcProvider.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0xaa36a7',
-              chainName: 'Sepolia Testnet',
-              rpcUrls: ['https://rpc.sepolia.org'],
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
-            }],
-          });
-          await new Promise(res => setTimeout(res, 600));
-        } catch { /* ignore */ }
-      }
-
-      const ethProvider = new ethers.providers.Web3Provider(wcProvider as any);
-      const network = await withTimeout(ethProvider.getNetwork(), TIMEOUT);
-
-      if (network.chainId !== 11155111 && network.chainId !== 31337) {
-        // Still wrong — show helpful error with direct link
-        setError('⚠ Switch MetaMask to Sepolia network, then tap Connect again.');
-        setBooted(true);
-        return;
-      }
-
-      setChainId(network.chainId);
-      setAccount(addr);
-      setConnType('walletconnect');
-      setError(null);
-      (window as any).__wcProvider = wcProvider;
-      await withTimeout(loadTradesForAddr(addr, wcProvider), TIMEOUT);
-      if (!localStorage.getItem('il-tour-v1')) setTimeout(() => setShowTour(true), 1200);
-    } catch (e: any) {
-      const m = String(e?.message || '');
-      if (!m.includes('closed') && !m.includes('rejected') && !m.includes('User rejected') && !m.includes('timeout')) {
-        setError('WalletConnect failed: ' + m.slice(0, 100));
-      }
-    } finally { setBooted(true); }
-  }, [loadTradesForAddr]);
+  // kept for compatibility but not shown in UI
+  const connectWalletConnect = useCallback(async () => {}, []);
 
   useEffect(() => {
     const l = document.createElement('link');
@@ -732,7 +591,6 @@ export default function Home() {
                   <div data-tour="wallet" style={{ ...S.chip, padding:'6px 12px 6px 8px' }}>
                     <div style={S.chipDot} />
                     <span style={{ fontSize:'11px', color:C.mid }}>{shortenAddr(account)}</span>
-                    {!isMobile && connType === 'walletconnect' && <span style={{ fontSize:'9px', color:'#38bdf8', marginLeft:'4px' }}>· WC</span>}
                     {!isMobile && chainId === 11155111 && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Sepolia</span>}
                     {!isMobile && chainId === 31337    && <span style={{ fontSize:'9px', color:C.dim, marginLeft:'4px' }}>· Local</span>}
                     <button style={S.chipX} onClick={disconnect}>✕</button>
@@ -759,7 +617,6 @@ export default function Home() {
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:'10px', width:'100%', maxWidth:'320px' }}>
                 <button data-tour="wallet" style={{ ...S.btnPrimary }} onClick={connectWallet}>🦊 Connect MetaMask</button>
-                <button style={{ ...S.btnGhost, color:'#38bdf8', borderColor:'rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.04)' }} onClick={connectWalletConnect}>📱 Connect via WalletConnect</button>
               </div>
               {error && <div style={{ ...S.alertErr, maxWidth:'400px' }}>{error}</div>}
             </div>
